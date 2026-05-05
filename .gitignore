@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.blend1
+*.blend2
+*.tmp
+*.log
+
+# Local scratch/export notes that are not part of the tool release.
+blender_chat_extracted.txt
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
