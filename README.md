@@ -1,5 +1,7 @@
 # KK/VRC Cloth Tools
 
+[简体中文](README_CN.md)
+
 This toolset helps convert VRC clothing to a Koikatsu/KK armature workflow. It currently contains two parts:
 
 - Blender add-on: `kk_vrc_cloth_tools`, used for bone grafting, vertex group remapping, risky-area weight mixing, fitted-clothing weight transfer, and armature topology export.
