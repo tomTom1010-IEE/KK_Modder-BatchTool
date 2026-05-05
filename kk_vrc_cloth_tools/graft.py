@@ -40,6 +40,57 @@ PARENT_ATTACHMENT_MAPS = {
     },
 }
 
+VRC_TO_KK_LIMB_PARENT_MAP = {
+    "Neck": "cf_j_neck",
+    "Head": "cf_j_head",
+    "Shoulder.L": "cf_j_shoulder_L",
+    "Upper_arm.L": "cf_j_arm00_L",
+    "Lower_arm.L": "cf_j_forearm01_L",
+    "Hand.L": "cf_j_hand_L",
+    "Shoulder.R": "cf_j_shoulder_R",
+    "Upper_arm.R": "cf_j_arm00_R",
+    "Lower_arm.R": "cf_j_forearm01_R",
+    "Hand.R": "cf_j_hand_R",
+    "Upper_leg.L": "cf_j_thigh00_L",
+    "Lower_leg.L": "cf_j_leg01_L",
+    "Foot.L": "cf_j_foot_L",
+    "Toe.L": "cf_j_toes_L",
+    "Upper_leg.R": "cf_j_thigh00_R",
+    "Lower_leg.R": "cf_j_leg01_R",
+    "Foot.R": "cf_j_foot_R",
+    "Toe.R": "cf_j_toes_R",
+    "Thumb Proximal.L": "cf_j_thumb01_L",
+    "Thumb Intermediate.L": "cf_j_thumb02_L",
+    "Thumb Distal.L": "cf_j_thumb03_L",
+    "Index Proximal.L": "cf_j_index01_L",
+    "Index Intermediate.L": "cf_j_index02_L",
+    "Index Distal.L": "cf_j_index03_L",
+    "Middle Proximal.L": "cf_j_middle01_L",
+    "Middle Intermediate.L": "cf_j_middle02_L",
+    "Middle Distal.L": "cf_j_middle03_L",
+    "Ring Proximal.L": "cf_j_ring01_L",
+    "Ring Intermediate.L": "cf_j_ring02_L",
+    "Ring Distal.L": "cf_j_ring03_L",
+    "Little Proximal.L": "cf_j_little01_L",
+    "Little Intermediate.L": "cf_j_little02_L",
+    "Little Distal.L": "cf_j_little03_L",
+    "Thumb Proximal.R": "cf_j_thumb01_R",
+    "Thumb Intermediate.R": "cf_j_thumb02_R",
+    "Thumb Distal.R": "cf_j_thumb03_R",
+    "Index Proximal.R": "cf_j_index01_R",
+    "Index Intermediate.R": "cf_j_index02_R",
+    "Index Distal.R": "cf_j_index03_R",
+    "Middle Proximal.R": "cf_j_middle01_R",
+    "Middle Intermediate.R": "cf_j_middle02_R",
+    "Middle Distal.R": "cf_j_middle03_R",
+    "Ring Proximal.R": "cf_j_ring01_R",
+    "Ring Intermediate.R": "cf_j_ring02_R",
+    "Ring Distal.R": "cf_j_ring03_R",
+    "Little Proximal.R": "cf_j_little01_R",
+    "Little Intermediate.R": "cf_j_little02_R",
+    "Little Distal.R": "cf_j_little03_R",
+}
+
 REPORT_ONLY_PATTERNS = (
     "CYCRGlove_*",
     "CYCRBoots_*",
@@ -66,6 +117,10 @@ VRC_HUMANOID_BONES = {
     "Upper_arm.R",
     "Lower_arm.L",
     "Lower_arm.R",
+    "Upper_arm_support.L",
+    "Upper_arm_support.R",
+    "Lower_arm_support.L",
+    "Lower_arm_support.R",
     "Hand.L",
     "Hand.R",
     "Upper_leg.L",
@@ -76,9 +131,39 @@ VRC_HUMANOID_BONES = {
     "Foot.R",
     "Toe.L",
     "Toe.R",
+    "Thumb Proximal.L",
+    "Thumb Intermediate.L",
+    "Thumb Distal.L",
+    "Index Proximal.L",
+    "Index Intermediate.L",
+    "Index Distal.L",
+    "Middle Proximal.L",
+    "Middle Intermediate.L",
+    "Middle Distal.L",
+    "Ring Proximal.L",
+    "Ring Intermediate.L",
+    "Ring Distal.L",
+    "Little Proximal.L",
+    "Little Intermediate.L",
+    "Little Distal.L",
+    "Thumb Proximal.R",
+    "Thumb Intermediate.R",
+    "Thumb Distal.R",
+    "Index Proximal.R",
+    "Index Intermediate.R",
+    "Index Distal.R",
+    "Middle Proximal.R",
+    "Middle Intermediate.R",
+    "Middle Distal.R",
+    "Ring Proximal.R",
+    "Ring Intermediate.R",
+    "Ring Distal.R",
+    "Little Proximal.R",
+    "Little Intermediate.R",
+    "Little Distal.R",
 }
 
-TORSO_SOURCE_PARENTS = {"Hips", "Spine", "Chest", "Breast_root.L", "Breast_root.R"}
+GRAFTABLE_SOURCE_PARENTS = set(PARENT_ATTACHMENT_MAPS["WAIST"]) | set(VRC_TO_KK_LIMB_PARENT_MAP)
 
 
 def get_bone_map(armature_obj):
@@ -114,7 +199,10 @@ def is_priority_root(name):
 
 
 def get_parent_attachment_target(parent_name, attachment_mode):
-    return PARENT_ATTACHMENT_MAPS.get(attachment_mode, PARENT_ATTACHMENT_MAPS["WAIST"]).get(parent_name)
+    torso_target = PARENT_ATTACHMENT_MAPS.get(attachment_mode, PARENT_ATTACHMENT_MAPS["WAIST"]).get(parent_name)
+    if torso_target:
+        return torso_target
+    return VRC_TO_KK_LIMB_PARENT_MAP.get(parent_name)
 
 
 def classify_candidate(name, parent_name, attachment_mode):
@@ -122,13 +210,15 @@ def classify_candidate(name, parent_name, attachment_mode):
         return 1, PRIORITY_1_NAME_OVERRIDES[name], "priority 1 name override"
     if name in PRIORITY_2_NAME_OVERRIDES:
         return 2, PRIORITY_2_NAME_OVERRIDES[name], "priority 2 name override"
-    if matches_any_pattern(name, REPORT_ONLY_PATTERNS):
-        return 3, None, "priority 3 report-only"
     parent_target = get_parent_attachment_target(parent_name, attachment_mode)
     if parent_target:
         if parent_name in {"Breast_root.L", "Breast_root.R"}:
             return 2, parent_target, "priority 2 parent-derived"
+        if parent_name in VRC_TO_KK_LIMB_PARENT_MAP:
+            return 1, parent_target, "priority 1 limb parent-derived"
         return 1, parent_target, "priority 1 parent-derived"
+    if matches_any_pattern(name, REPORT_ONLY_PATTERNS):
+        return 3, None, "priority 3 report-only"
     return 0, None, "unmapped"
 
 
@@ -139,7 +229,7 @@ def is_candidate_root(bone, children_map):
         return True
     if matches_any_pattern(bone.name, REPORT_ONLY_PATTERNS):
         return True
-    if bone.parent and bone.parent.name in TORSO_SOURCE_PARENTS and children_map.get(bone.name):
+    if bone.parent and bone.parent.name in GRAFTABLE_SOURCE_PARENTS:
         return True
     return False
 
@@ -182,6 +272,42 @@ def scan_candidates(vrc_armature, kk_armature, attachment_mode="WAIST"):
             }
         )
     return roots
+
+
+def get_selected_meshes_for_graft(context):
+    meshes = [obj for obj in context.selected_objects if common.is_mesh(obj)]
+    if not meshes:
+        raise RuntimeError("Select at least one clothing mesh when using selected-mesh-only graft.")
+    return meshes
+
+
+def mesh_uses_armature(mesh_obj, armature_obj):
+    if mesh_obj.parent == armature_obj:
+        return True
+    for modifier in mesh_obj.modifiers:
+        if modifier.type == "ARMATURE" and modifier.object == armature_obj:
+            return True
+    return False
+
+
+def collect_weighted_vertex_group_names(meshes):
+    names = set()
+    for mesh in meshes:
+        for vertex_group in mesh.vertex_groups:
+            if common.group_has_weights(mesh, vertex_group.index):
+                names.add(vertex_group.name)
+    return names
+
+
+def filter_candidates_by_mesh_weights(candidates, weighted_group_names):
+    if not weighted_group_names:
+        return []
+
+    filtered = []
+    for candidate in candidates:
+        if any(name in weighted_group_names for name in candidate["chain"]):
+            filtered.append(candidate)
+    return filtered
 
 
 def copy_chains_to_kk(kk_armature, vrc_armature, candidates):
@@ -241,9 +367,10 @@ def copy_chains_to_kk(kk_armature, vrc_armature, candidates):
     return copied
 
 
-def retarget_armature_modifiers(vrc_armature, kk_armature):
+def retarget_armature_modifiers(vrc_armature, kk_armature, meshes=None):
     changed = []
-    for obj in bpy.data.objects:
+    objects = meshes if meshes is not None else bpy.data.objects
+    for obj in objects:
         if obj.type != "MESH":
             continue
         for modifier in obj.modifiers:
@@ -253,9 +380,10 @@ def retarget_armature_modifiers(vrc_armature, kk_armature):
     return sorted(set(changed))
 
 
-def reparent_vrc_meshes_to_kk(vrc_armature, kk_armature):
+def reparent_vrc_meshes_to_kk(vrc_armature, kk_armature, meshes=None):
     changed = []
-    for obj in bpy.data.objects:
+    objects = meshes if meshes is not None else bpy.data.objects
+    for obj in objects:
         if obj.type != "MESH" or obj.parent != vrc_armature:
             continue
         world_matrix = obj.matrix_world.copy()
@@ -310,6 +438,15 @@ class KKVRC_OT_graft_clothes_bones(bpy.types.Operator):
         try:
             kk_armature, vrc_armature = common.get_selected_armatures(context)
             candidates = scan_candidates(vrc_armature, kk_armature, props.graft_attachment_mode)
+            selected_meshes = []
+            weighted_group_names = set()
+            if props.graft_selected_meshes_only:
+                selected_meshes = get_selected_meshes_for_graft(context)
+                selected_meshes = [mesh for mesh in selected_meshes if mesh_uses_armature(mesh, vrc_armature)]
+                if not selected_meshes:
+                    raise RuntimeError("Selected mesh(es) are not parented to, or modified by, the VRC source Armature.")
+                weighted_group_names = collect_weighted_vertex_group_names(selected_meshes)
+                candidates = filter_candidates_by_mesh_weights(candidates, weighted_group_names)
         except Exception as ex:
             self.report({"ERROR"}, str(ex))
             common.set_status(context, f"Graft failed: {ex}")
@@ -331,6 +468,10 @@ class KKVRC_OT_graft_clothes_bones(bpy.types.Operator):
 
         if self.action == "SCAN":
             report_candidates("Auto Graft Preview", candidates)
+            if props.graft_selected_meshes_only:
+                print(f"Selected-mesh-only mode: ON")
+                print(f"Selected meshes: {', '.join(mesh.name for mesh in selected_meshes)}")
+                print(f"Weighted groups on selected meshes: {len(weighted_group_names)}")
             self.report({"INFO"}, f"Found {len(candidates)} candidate root(s). See console.")
             common.set_status(context, f"Graft preview: {len(candidates)} candidate root(s)")
             return {"FINISHED"}
@@ -344,14 +485,16 @@ class KKVRC_OT_graft_clothes_bones(bpy.types.Operator):
             return {"FINISHED"}
 
         if not selected:
-            self.report({"WARNING"}, "No selected candidates to graft. Run Scan Preview first.")
-            common.set_status(context, "Graft apply skipped: no selected candidates")
-            return {"CANCELLED"}
+            if not props.graft_selected_meshes_only:
+                self.report({"WARNING"}, "No selected candidates to graft. Run Scan Preview first.")
+                common.set_status(context, "Graft apply skipped: no selected candidates")
+                return {"CANCELLED"}
 
         try:
-            copied = copy_chains_to_kk(kk_armature, vrc_armature, selected)
-            changed_meshes = retarget_armature_modifiers(vrc_armature, kk_armature)
-            reparented_meshes = reparent_vrc_meshes_to_kk(vrc_armature, kk_armature)
+            copied = copy_chains_to_kk(kk_armature, vrc_armature, selected) if selected else []
+            scope_meshes = selected_meshes if props.graft_selected_meshes_only else None
+            changed_meshes = retarget_armature_modifiers(vrc_armature, kk_armature, scope_meshes)
+            reparented_meshes = reparent_vrc_meshes_to_kk(vrc_armature, kk_armature, scope_meshes)
             if props.graft_delete_vrc_armature:
                 bpy.data.objects.remove(vrc_armature, do_unlink=True)
         except Exception as ex:
@@ -366,7 +509,7 @@ class KKVRC_OT_graft_clothes_bones(bpy.types.Operator):
         print(f"Retargeted meshes: {', '.join(changed_meshes) if changed_meshes else '(none)'}")
         print(f"Reparented meshes: {', '.join(reparented_meshes) if reparented_meshes else '(none)'}")
         print(f"Deleted source Armature: {props.graft_delete_vrc_armature}")
+        print(f"Selected-mesh-only mode: {props.graft_selected_meshes_only}")
         self.report({"INFO"}, f"Grafted {len(selected)} root(s), copied {len(copied)} bone(s).")
         common.set_status(context, f"Grafted {len(selected)} root(s), copied {len(copied)} bone(s)")
         return {"FINISHED"}
-

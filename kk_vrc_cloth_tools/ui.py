@@ -7,6 +7,11 @@ from . import common
 class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
     graft_include_priority_1: bpy.props.BoolProperty(name="Priority 1 torso/skirt roots", default=True)
     graft_include_priority_2: bpy.props.BoolProperty(name="Priority 2 breast/upper-clothes roots", default=False)
+    graft_selected_meshes_only: bpy.props.BoolProperty(
+        name="Only graft bones used by selected meshes",
+        default=False,
+        description="Only copy clothing bone chains weighted by selected meshes; useful for gloves/socks cleanup",
+    )
     graft_delete_vrc_armature: bpy.props.BoolProperty(name="Delete VRC source Armature after graft", default=True)
     graft_attachment_mode: bpy.props.EnumProperty(
         name="Parent-derived attach mode",
@@ -78,12 +83,58 @@ class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
         description="Only vertices with non-KK physical weight at or below this value receive transferred body weights",
     )
     transfer_replace_body_weights: bpy.props.BoolProperty(name="Replace existing KK body weights", default=True)
+    transfer_treat_vrc_humanoid_as_body: bpy.props.BoolProperty(
+        name="Treat VRC humanoid groups as body weights",
+        default=True,
+        description="Do not count VRC humanoid/finger groups as protected physical weights during transfer",
+    )
+    transfer_remove_replaced_non_kk_groups: bpy.props.BoolProperty(
+        name="Remove replaced non-KK groups after apply",
+        default=True,
+        description="Remove replaceable VRC humanoid/finger groups from affected vertices after applying transfer",
+    )
     transfer_normalize_affected_only: bpy.props.BoolProperty(name="Normalize affected vertices only", default=True)
     transfer_max_distance: bpy.props.FloatProperty(
         name="Max transfer distance",
         default=0.0,
         min=0.0,
         description="0 disables distance filtering",
+    )
+    transfer_dynamic_cleanup_threshold: bpy.props.FloatProperty(
+        name="Dynamic cleanup threshold",
+        default=0.05,
+        min=0.0,
+        max=1.0,
+        description="Remove KK body weights from vertices whose clothing dynamic weight is above this value",
+    )
+    transfer_dynamic_cleanup_normalize: bpy.props.BoolProperty(
+        name="Normalize after dynamic cleanup",
+        default=True,
+    )
+
+    glove_align_side: bpy.props.EnumProperty(
+        name="Side",
+        items=(
+            ("BOTH", "Both Hands", "Align both left and right VRC hands"),
+            ("LEFT", "Left Hand", "Align only the left VRC hand"),
+            ("RIGHT", "Right Hand", "Align only the right VRC hand"),
+        ),
+        default="BOTH",
+    )
+    glove_align_transform_mode: bpy.props.EnumProperty(
+        name="Pose transform",
+        items=(
+            ("ROTATION", "Rotate only", "Match KK joint-chain directions while preserving VRC joint positions"),
+            ("ROTATION_LOCATION", "Rotate + move", "Match KK joint-chain directions and joint positions"),
+        ),
+        default="ROTATION",
+    )
+    glove_align_influence: bpy.props.FloatProperty(
+        name="Influence",
+        default=1.0,
+        min=0.0,
+        max=1.0,
+        description="Blend between current VRC hand pose and KK-aligned pose",
     )
 
     last_status: bpy.props.StringProperty(name="Last Status", default="Ready")
@@ -121,6 +172,7 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
         box.label(text="Step 1 - Graft Clothes Physical Bones To KK")
         box.prop(props, "graft_include_priority_1")
         box.prop(props, "graft_include_priority_2")
+        box.prop(props, "graft_selected_meshes_only")
         box.prop(props, "graft_attachment_mode")
         box.prop(props, "graft_delete_vrc_armature")
         action_buttons(box, "kkvrc.graft_clothes_bones", "SCAN", "APPLY", "REPORT", "Report Roots")
@@ -178,9 +230,22 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
         box.prop(props, "transfer_source_body_mesh")
         box.prop(props, "transfer_physical_threshold")
         box.prop(props, "transfer_replace_body_weights")
+        box.prop(props, "transfer_treat_vrc_humanoid_as_body")
+        box.prop(props, "transfer_remove_replaced_non_kk_groups")
         box.prop(props, "transfer_normalize_affected_only")
         box.prop(props, "transfer_max_distance")
         action_buttons(box, "kkvrc.transfer_body_weights_to_fitted_clothes")
+        box.separator()
+        box.prop(props, "transfer_dynamic_cleanup_threshold")
+        box.prop(props, "transfer_dynamic_cleanup_normalize")
+        action_buttons(box, "kkvrc.cleanup_dynamic_body_weights", "PREVIEW", "APPLY", "REPORT", "Report Cleanup")
+
+        box = layout.box()
+        box.label(text="Step 6 - Align VRC Glove Hand Pose To KK")
+        box.prop(props, "glove_align_side")
+        box.prop(props, "glove_align_transform_mode")
+        box.prop(props, "glove_align_influence")
+        action_buttons(box, "kkvrc.align_vrc_glove_pose_to_kk", "PREVIEW", "APPLY", "RESET", "Reset Hand Pose")
 
         box = layout.box()
         box.label(text="Utilities")

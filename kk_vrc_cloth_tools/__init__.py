@@ -10,7 +10,18 @@ bl_info = {
 
 if "bpy" in locals():
     import importlib
-    for _module in (common, graft, weights_body, weights_torso, weights_breast, weights_transfer, topology_export, translations, ui):
+    from . import common
+    from . import graft
+    from . import weights_body
+    from . import weights_torso
+    from . import weights_breast
+    from . import weights_transfer
+    from . import glove_align
+    from . import topology_export
+    from . import translations
+    from . import ui
+
+    for _module in (common, graft, weights_body, weights_torso, weights_breast, weights_transfer, glove_align, topology_export, translations, ui):
         importlib.reload(_module)
 else:
     from . import common
@@ -19,6 +30,7 @@ else:
     from . import weights_torso
     from . import weights_breast
     from . import weights_transfer
+    from . import glove_align
     from . import topology_export
     from . import translations
     from . import ui
@@ -34,6 +46,8 @@ CLASSES = (
     weights_breast.KKVRC_OT_remap_breast_simple,
     weights_breast.KKVRC_OT_mix_breast_local,
     weights_transfer.KKVRC_OT_transfer_body_weights_to_fitted_clothes,
+    weights_transfer.KKVRC_OT_cleanup_dynamic_body_weights,
+    glove_align.KKVRC_OT_align_vrc_glove_pose_to_kk,
     topology_export.KKVRC_OT_export_armature_topology,
     ui.KKVRC_PT_cloth_tools,
 )
