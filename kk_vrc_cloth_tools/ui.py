@@ -111,6 +111,30 @@ class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
         name="Normalize after dynamic cleanup",
         default=True,
     )
+    cleanup_delete_mode: bpy.props.EnumProperty(
+        name="Bone delete mode",
+        items=(
+            ("SUBTREE_TO_PARENT", "Merge subtree to parent", "Delete the whole selected subtree and merge all subtree weights to the outside parent"),
+            ("NODE_TO_PARENT", "Merge node, graft children", "Delete only the selected node, merge its weights to parent, and graft child chains to parent"),
+        ),
+        default="SUBTREE_TO_PARENT",
+    )
+    cleanup_simplify_keep_every: bpy.props.IntProperty(
+        name="Keep every N bones",
+        default=2,
+        min=1,
+        max=32,
+    )
+    cleanup_hair_tip_patterns: bpy.props.StringProperty(
+        name="Hair tip patterns",
+        default="CYCRHair*_tip,*Hair*_tip,*_tip",
+        description="Comma-separated leaf bone name patterns",
+    )
+    cleanup_merge_weighted_hair_tips: bpy.props.BoolProperty(
+        name="Merge weighted hair tips",
+        default=False,
+        description="If enabled, weighted hair tip placeholders are merged to parent before deletion",
+    )
 
     glove_align_side: bpy.props.EnumProperty(
         name="Side",
@@ -235,10 +259,6 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
         box.prop(props, "transfer_normalize_affected_only")
         box.prop(props, "transfer_max_distance")
         action_buttons(box, "kkvrc.transfer_body_weights_to_fitted_clothes")
-        box.separator()
-        box.prop(props, "transfer_dynamic_cleanup_threshold")
-        box.prop(props, "transfer_dynamic_cleanup_normalize")
-        action_buttons(box, "kkvrc.cleanup_dynamic_body_weights", "PREVIEW", "APPLY", "REPORT", "Report Cleanup")
 
         box = layout.box()
         box.label(text="Step 6 - Align VRC Glove Hand Pose To KK")
@@ -249,6 +269,36 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Utilities")
+        box.label(text="Clean Body Weights From Dynamic Areas")
+        box.prop(props, "transfer_dynamic_cleanup_threshold")
+        box.prop(props, "transfer_dynamic_cleanup_normalize")
+        action_buttons(box, "kkvrc.cleanup_dynamic_body_weights", "PREVIEW", "APPLY", "REPORT", "Report Cleanup")
+        box.separator()
+        box.label(text="Delete Selected Bone Chain/Subtree")
+        box.prop(props, "cleanup_delete_mode")
+        row = box.row(align=True)
+        op = row.operator("kkvrc.delete_selected_bone_tree", text="Preview")
+        op.action = "PREVIEW"
+        op = row.operator("kkvrc.delete_selected_bone_tree", text="Apply")
+        op.action = "APPLY"
+        box.separator()
+        box.label(text="Simplify Selected Physical Bone Chain")
+        box.prop(props, "cleanup_simplify_keep_every")
+        row = box.row(align=True)
+        op = row.operator("kkvrc.simplify_selected_bone_chain", text="Preview")
+        op.action = "PREVIEW"
+        op = row.operator("kkvrc.simplify_selected_bone_chain", text="Apply")
+        op.action = "APPLY"
+        box.separator()
+        box.label(text="Clean VRC Hair Tip Placeholders")
+        box.prop(props, "cleanup_hair_tip_patterns")
+        box.prop(props, "cleanup_merge_weighted_hair_tips")
+        row = box.row(align=True)
+        op = row.operator("kkvrc.cleanup_hair_tip_placeholders", text="Preview")
+        op.action = "PREVIEW"
+        op = row.operator("kkvrc.cleanup_hair_tip_placeholders", text="Apply")
+        op.action = "APPLY"
+        box.separator()
         box.operator("kkvrc.export_armature_topology", text="Export Armature Topology JSON")
 
         box = layout.box()
