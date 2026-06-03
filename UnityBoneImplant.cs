@@ -16,9 +16,17 @@ public class AutoBoneImplantProcess : EditorWindow
     private bool addDynamicBoneComponents;
     private bool ignoreExistingDynamicBones = true;
     private DynamicBoneBindMode dynamicBoneBindMode = DynamicBoneBindMode.ImplantRoots;
+    private int hairDynamicBoneLevel = 1;
+    private string hairRootMarkers = "root";
+    private string hairNameMarkers = "hair";
+    private bool hairUseBranchFallback = true;
+    private bool hairRequireSkinnedBoneEvidence = true;
+    private bool hairIgnoreExistingDynamicBones = true;
     private string customPrefixes = DefaultPrefixes;
     private Vector2 previewScroll;
+    private Vector2 hairPreviewScroll;
     private List<ImplantCandidate> preview = new List<ImplantCandidate>();
+    private List<HairDynamicBoneCandidate> hairPreview = new List<HairDynamicBoneCandidate>();
 
     private enum DynamicBoneBindMode
     {
@@ -265,6 +273,37 @@ public class AutoBoneImplantProcess : EditorWindow
         EditorGUI.EndDisabledGroup();
 
         EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Hair Dynamic Bone", EditorStyles.boldLabel);
+        hairRootMarkers = EditorGUILayout.TextField("Root markers", hairRootMarkers);
+        hairNameMarkers = EditorGUILayout.TextField("Hair name markers", hairNameMarkers);
+        hairDynamicBoneLevel = EditorGUILayout.IntField("Bind level after nearest root", hairDynamicBoneLevel);
+        if (hairDynamicBoneLevel < 1)
+            hairDynamicBoneLevel = 1;
+        hairUseBranchFallback = EditorGUILayout.ToggleLeft(
+            "Fallback: count from unbranched chain starts",
+            hairUseBranchFallback);
+        hairRequireSkinnedBoneEvidence = EditorGUILayout.ToggleLeft(
+            "Require SkinnedMeshRenderer bone evidence",
+            hairRequireSkinnedBoneEvidence);
+        hairIgnoreExistingDynamicBones = EditorGUILayout.ToggleLeft(
+            "Skip existing Dynamic Bone roots",
+            hairIgnoreExistingDynamicBones);
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Scan Hair Preview"))
+        {
+            ScanHairDynamicBonePreview();
+        }
+
+        EditorGUI.BeginDisabledGroup(hairPreview.Count == 0);
+        if (GUILayout.Button("Apply Hair Dynamic Bones"))
+        {
+            ApplyHairDynamicBonePreview();
+        }
+        EditorGUI.EndDisabledGroup();
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space();
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Scan Preview"))
         {
@@ -280,6 +319,7 @@ public class AutoBoneImplantProcess : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         DrawPreview();
+        DrawHairDynamicBonePreview();
     }
 
     private void ScanPreview()
@@ -311,6 +351,63 @@ public class AutoBoneImplantProcess : EditorWindow
         }
 
         Debug.Log("Auto Bone Implant preview found " + preview.Count + " candidate(s).");
+    }
+
+    private void ScanHairDynamicBonePreview()
+    {
+        hairPreview.Clear();
+
+        if (rootObject == null)
+        {
+            Debug.LogError("Please assign a root object first.");
+            return;
+        }
+
+        Type dynamicBoneType = FindTypeByName("DynamicBone");
+        HashSet<Transform> skinnedBones = CollectSkinnedBones(rootObject);
+        string[] rootMarkers = ParsePrefixes(hairRootMarkers);
+        string[] nameMarkers = ParsePrefixes(hairNameMarkers);
+        Transform[] allTransforms = rootObject.GetComponentsInChildren<Transform>(true);
+
+        foreach (Transform bone in allTransforms)
+        {
+            HairDynamicBoneCandidate candidate = TryCreateHairDynamicBoneCandidate(
+                bone,
+                dynamicBoneType,
+                skinnedBones,
+                rootMarkers,
+                nameMarkers);
+            AddUniqueHairCandidate(candidate);
+        }
+
+        if (hairUseBranchFallback)
+        {
+            foreach (Transform bone in allTransforms)
+            {
+                HairDynamicBoneCandidate candidate = TryCreateHairFallbackDynamicBoneCandidate(
+                    bone,
+                    dynamicBoneType,
+                    skinnedBones,
+                    nameMarkers);
+                AddUniqueHairCandidate(candidate);
+            }
+        }
+
+        Debug.Log("Hair DynamicBone preview found " + hairPreview.Count + " candidate(s).");
+    }
+
+    private void AddUniqueHairCandidate(HairDynamicBoneCandidate candidate)
+    {
+        if (candidate == null || candidate.Root == null)
+            return;
+
+        foreach (HairDynamicBoneCandidate existing in hairPreview)
+        {
+            if (existing != null && existing.Root == candidate.Root)
+                return;
+        }
+
+        hairPreview.Add(candidate);
     }
 
     private ImplantCandidate TryCreateCandidate(
@@ -415,6 +512,48 @@ public class AutoBoneImplantProcess : EditorWindow
         ScanPreview();
     }
 
+    private void ApplyHairDynamicBonePreview()
+    {
+        if (rootObject == null)
+        {
+            Debug.LogError("Please assign a root object first.");
+            return;
+        }
+
+        Type dynamicBoneType = FindTypeByName("DynamicBone");
+        if (dynamicBoneType == null)
+        {
+            Debug.LogError("DynamicBone type not found. Import Dynamic Bone first.");
+            return;
+        }
+
+        int added = 0;
+        int skipped = 0;
+        int failed = 0;
+
+        foreach (HairDynamicBoneCandidate candidate in hairPreview)
+        {
+            if (candidate == null || candidate.Root == null)
+                continue;
+
+            Component existing = FindExistingDynamicBone(dynamicBoneType, rootObject, candidate.Root);
+            if (existing != null && hairIgnoreExistingDynamicBones)
+            {
+                skipped++;
+                continue;
+            }
+
+            if (AddOrUpdateDynamicBone(dynamicBoneType, rootObject, candidate.Root, existing))
+                added++;
+            else
+                failed++;
+        }
+
+        EditorUtility.SetDirty(rootObject);
+        Debug.Log("Hair DynamicBone finished. Added/Updated: " + added + ", Skipped: " + skipped + ", Failed: " + failed);
+        ScanHairDynamicBonePreview();
+    }
+
     private void DrawPreview()
     {
         EditorGUILayout.Space();
@@ -439,6 +578,43 @@ public class AutoBoneImplantProcess : EditorWindow
             if (addDynamicBoneComponents)
                 dynamicRoots = ", dynamic roots: " + CountDynamicRoots(candidate.Source);
             EditorGUILayout.LabelField(candidate.Source.name + " -> " + candidate.Destination.name + " (" + evidence + existing + dynamicRoots + ")");
+        }
+
+        EditorGUILayout.EndScrollView();
+    }
+
+    private void DrawHairDynamicBonePreview()
+    {
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Hair Dynamic Bone Preview (" + hairPreview.Count + ")", EditorStyles.boldLabel);
+
+        if (hairPreview.Count == 0)
+        {
+            EditorGUILayout.HelpBox("Scan to preview hair Dynamic Bone roots found by nearest Root marker and level.", MessageType.Info);
+            return;
+        }
+
+        hairPreviewScroll = EditorGUILayout.BeginScrollView(hairPreviewScroll, GUILayout.MinHeight(160));
+
+        foreach (HairDynamicBoneCandidate candidate in hairPreview)
+        {
+            if (candidate == null || candidate.Root == null || candidate.NearestRoot == null)
+                continue;
+
+            string evidence = candidate.HasSkinnedBoneEvidence ? "weighted/descendant weighted" : "no renderer evidence";
+            string existing = candidate.HasExistingDynamicBone ? ", existing DynamicBone" : "";
+            EditorGUILayout.LabelField(
+                candidate.Root.name +
+                " <- " +
+                candidate.SourceLabel +
+                " " +
+                candidate.NearestRoot.name +
+                ", level " +
+                candidate.Level +
+                " (" +
+                evidence +
+                existing +
+                ")");
         }
 
         EditorGUILayout.EndScrollView();
@@ -549,6 +725,181 @@ public class AutoBoneImplantProcess : EditorWindow
         }
 
         return null;
+    }
+
+    private HairDynamicBoneCandidate TryCreateHairDynamicBoneCandidate(
+        Transform bone,
+        Type dynamicBoneType,
+        HashSet<Transform> skinnedBones,
+        string[] rootMarkers,
+        string[] nameMarkers)
+    {
+        if (bone == null || bone.parent == null)
+            return null;
+
+        if (IsRootMarkerName(bone.name, rootMarkers))
+            return null;
+
+        Transform nearestRoot = FindNearestRootMarkerAncestor(bone, rootMarkers);
+        if (nearestRoot == null)
+            return null;
+
+        if (!HasHairNameMarkerBetween(nearestRoot, bone, nameMarkers))
+            return null;
+
+        int level = GetAncestorDistance(bone, nearestRoot);
+        if (level != hairDynamicBoneLevel)
+            return null;
+
+        bool hasBoneEvidence = HasBoneEvidence(bone, skinnedBones);
+        if (hairRequireSkinnedBoneEvidence && !hasBoneEvidence)
+            return null;
+
+        bool hasExistingDynamicBone = dynamicBoneType != null && FindExistingDynamicBone(dynamicBoneType, rootObject, bone) != null;
+        if (hairIgnoreExistingDynamicBones && hasExistingDynamicBone)
+            return null;
+
+        return new HairDynamicBoneCandidate
+        {
+            Root = bone,
+            NearestRoot = nearestRoot,
+            Level = level,
+            SourceLabel = "nearest root",
+            HasSkinnedBoneEvidence = hasBoneEvidence,
+            HasExistingDynamicBone = hasExistingDynamicBone
+        };
+    }
+
+    private HairDynamicBoneCandidate TryCreateHairFallbackDynamicBoneCandidate(
+        Transform bone,
+        Type dynamicBoneType,
+        HashSet<Transform> skinnedBones,
+        string[] nameMarkers)
+    {
+        if (bone == null || bone.parent == null)
+            return null;
+
+        if (!HasHairNameMarkerBetween(bone, bone, nameMarkers))
+            return null;
+
+        Transform chainStart = FindUnbranchedChainStart(bone);
+        if (chainStart == null)
+            return null;
+
+        int level = GetAncestorDistance(bone, chainStart) + 1;
+        if (level != hairDynamicBoneLevel)
+            return null;
+
+        bool hasBoneEvidence = HasBoneEvidence(bone, skinnedBones);
+        if (hairRequireSkinnedBoneEvidence && !hasBoneEvidence)
+            return null;
+
+        bool hasExistingDynamicBone = dynamicBoneType != null && FindExistingDynamicBone(dynamicBoneType, rootObject, bone) != null;
+        if (hairIgnoreExistingDynamicBones && hasExistingDynamicBone)
+            return null;
+
+        return new HairDynamicBoneCandidate
+        {
+            Root = bone,
+            NearestRoot = chainStart,
+            Level = level,
+            SourceLabel = "chain start",
+            HasSkinnedBoneEvidence = hasBoneEvidence,
+            HasExistingDynamicBone = hasExistingDynamicBone
+        };
+    }
+
+    private static Transform FindNearestRootMarkerAncestor(Transform bone, string[] rootMarkers)
+    {
+        Transform current = bone.parent;
+        while (current != null)
+        {
+            if (IsRootMarkerName(current.name, rootMarkers))
+                return current;
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    private static int GetAncestorDistance(Transform bone, Transform ancestor)
+    {
+        int distance = 0;
+        Transform current = bone;
+        while (current != null && current != ancestor)
+        {
+            distance++;
+            current = current.parent;
+        }
+
+        return current == ancestor ? distance : -1;
+    }
+
+    private static Transform FindUnbranchedChainStart(Transform bone)
+    {
+        Transform current = bone;
+        while (current.parent != null && current.parent.childCount == 1)
+        {
+            current = current.parent;
+        }
+
+        if (current == bone && bone.parent != null && bone.parent.childCount == 1)
+            return null;
+
+        return current;
+    }
+
+    private static bool IsRootMarkerName(string name, string[] rootMarkers)
+    {
+        if (string.IsNullOrEmpty(name))
+            return false;
+
+        if (rootMarkers == null || rootMarkers.Length == 0)
+            return name.IndexOf("root", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        foreach (string marker in rootMarkers)
+        {
+            if (string.IsNullOrEmpty(marker))
+                continue;
+            if (name.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasHairNameMarkerBetween(Transform nearestRoot, Transform bone, string[] nameMarkers)
+    {
+        if (nameMarkers == null || nameMarkers.Length == 0)
+            return true;
+
+        Transform current = bone;
+        while (current != null)
+        {
+            if (HasAnyNameMarker(current.name, nameMarkers))
+                return true;
+            if (current == nearestRoot)
+                break;
+            current = current.parent;
+        }
+
+        return false;
+    }
+
+    private static bool HasAnyNameMarker(string name, string[] markers)
+    {
+        if (string.IsNullOrEmpty(name) || markers == null)
+            return false;
+
+        foreach (string marker in markers)
+        {
+            if (string.IsNullOrEmpty(marker))
+                continue;
+            if (name.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+
+        return false;
     }
 
     private static FieldInfo FindDynamicBoneRootField(Type dynamicBoneType)
@@ -720,6 +1071,16 @@ public class AutoBoneImplantProcess : EditorWindow
         public Transform Destination;
         public bool HasSkinnedBoneEvidence;
         public bool HasExistingComponent;
+    }
+
+    private class HairDynamicBoneCandidate
+    {
+        public Transform Root;
+        public Transform NearestRoot;
+        public int Level;
+        public string SourceLabel;
+        public bool HasSkinnedBoneEvidence;
+        public bool HasExistingDynamicBone;
     }
 
     private struct DynamicBoneApplyResult

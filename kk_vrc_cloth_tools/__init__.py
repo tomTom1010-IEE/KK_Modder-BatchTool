@@ -16,13 +16,14 @@ if "bpy" in locals():
     from . import weights_torso
     from . import weights_breast
     from . import weights_transfer
+    from . import weights_hybrid
     from . import glove_align
     from . import bone_cleanup
     from . import topology_export
     from . import translations
     from . import ui
 
-    for _module in (common, graft, weights_body, weights_torso, weights_breast, weights_transfer, glove_align, bone_cleanup, topology_export, translations, ui):
+    for _module in (common, graft, weights_body, weights_torso, weights_breast, weights_transfer, weights_hybrid, glove_align, bone_cleanup, topology_export, translations, ui):
         importlib.reload(_module)
 else:
     from . import common
@@ -31,6 +32,7 @@ else:
     from . import weights_torso
     from . import weights_breast
     from . import weights_transfer
+    from . import weights_hybrid
     from . import glove_align
     from . import bone_cleanup
     from . import topology_export
@@ -49,9 +51,15 @@ CLASSES = (
     weights_breast.KKVRC_OT_mix_breast_local,
     weights_transfer.KKVRC_OT_transfer_body_weights_to_fitted_clothes,
     weights_transfer.KKVRC_OT_cleanup_dynamic_body_weights,
+    weights_transfer.KKVRC_OT_remove_empty_vertex_groups,
+    weights_transfer.KKVRC_OT_swap_lr_vertex_group_weights,
+    weights_transfer.KKVRC_OT_remove_bnip_weights,
+    weights_hybrid.KKVRC_OT_auto_hybrid_clothes_weights,
+    weights_hybrid.KKVRC_OT_postprocess_manual_skirt_weights,
     glove_align.KKVRC_OT_align_vrc_glove_pose_to_kk,
     bone_cleanup.KKVRC_OT_delete_selected_bone_tree,
     bone_cleanup.KKVRC_OT_simplify_selected_bone_chain,
+    bone_cleanup.KKVRC_OT_merge_selected_parallel_bone_chains,
     bone_cleanup.KKVRC_OT_cleanup_hair_tip_placeholders,
     topology_export.KKVRC_OT_export_armature_topology,
     ui.KKVRC_PT_cloth_tools,

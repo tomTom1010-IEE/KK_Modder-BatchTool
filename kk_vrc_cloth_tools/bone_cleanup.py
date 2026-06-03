@@ -2,6 +2,7 @@ import fnmatch
 from collections import deque
 
 import bpy
+from mathutils import Vector
 
 from . import common
 
@@ -75,6 +76,78 @@ def get_depths(children_map, root_name):
         for child_name in children_map.get(name, []):
             queue.append((child_name, depth + 1))
     return depths
+
+
+def filter_selected_root_bones(selected_names, parent_map):
+    selected_set = set(selected_names)
+    roots = []
+
+    for name in selected_names:
+        parent_name = parent_map.get(name)
+        has_selected_ancestor = False
+        while parent_name:
+            if parent_name in selected_set:
+                has_selected_ancestor = True
+                break
+            parent_name = parent_map.get(parent_name)
+
+        if not has_selected_ancestor:
+            roots.append(name)
+
+    return roots
+
+
+def collect_linear_chain(children_map, root_name):
+    chain = []
+    current = root_name
+
+    while current:
+        chain.append(current)
+        children = children_map.get(current, [])
+        if len(children) > 1:
+            raise RuntimeError(f"Parallel merge expects unbranched chains. Branch found at: {current}")
+        current = children[0] if children else None
+
+    return chain
+
+
+def choose_parallel_target_root(selected_roots, active_name, mode):
+    if not selected_roots:
+        raise RuntimeError("Select at least two parallel chain roots.")
+
+    if mode == "ACTIVE":
+        if active_name not in selected_roots:
+            raise RuntimeError("The active bone must be one of the selected parallel chain roots.")
+        return active_name
+
+    if mode == "LAST":
+        return selected_roots[-1]
+
+    return selected_roots[0]
+
+
+def map_parallel_chain_index(source_index, source_count, target_count, match_mode):
+    if target_count <= 1:
+        return 0
+
+    if match_mode == "BOTTOM":
+        source_from_tip = source_count - 1 - source_index
+        return max(0, target_count - 1 - source_from_tip)
+
+    if match_mode == "RATIO":
+        if source_count <= 1:
+            return 0
+        return round((source_index / (source_count - 1)) * (target_count - 1))
+
+    return min(source_index, target_count - 1)
+
+
+def build_parallel_merge_pairs(source_chain, target_chain, match_mode):
+    pairs = []
+    for source_index, source_name in enumerate(source_chain):
+        target_index = map_parallel_chain_index(source_index, len(source_chain), len(target_chain), match_mode)
+        pairs.append((source_name, target_chain[target_index]))
+    return pairs
 
 
 def get_armature_meshes(armature_obj):
@@ -199,6 +272,78 @@ def remove_single_bone_graft_children(armature_obj, bone_name):
     return removed, parent_name, child_names
 
 
+def ensure_nonzero_edit_bone_length(edit_bone):
+    if edit_bone.length > 0.0001:
+        return False
+
+    edit_bone.tail = edit_bone.head + Vector((0.0, 0.0, 0.01))
+    return True
+
+
+def reconnect_simplified_chain_tails(armature_obj, root_name, connect_single_children):
+    if bpy.context.mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+    bpy.ops.object.select_all(action="DESELECT")
+    armature_obj.select_set(True)
+    bpy.context.view_layer.objects.active = armature_obj
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    adjusted = 0
+    connected = 0
+    branch_adjusted = 0
+    fixed_zero_length = 0
+
+    try:
+        edit_bones = armature_obj.data.edit_bones
+        root = edit_bones.get(root_name)
+        if root is None:
+            return adjusted, connected, branch_adjusted, fixed_zero_length
+
+        bones = []
+        queue = deque([root])
+        while queue:
+            bone = queue.popleft()
+            bones.append(bone)
+            queue.extend(list(bone.children))
+
+        for bone in bones:
+            children = list(bone.children)
+            if not children:
+                if ensure_nonzero_edit_bone_length(bone):
+                    fixed_zero_length += 1
+                continue
+
+            if len(children) == 1:
+                child = children[0]
+                bone.tail = child.head.copy()
+                adjusted += 1
+                if connect_single_children:
+                    child.use_connect = True
+                    connected += 1
+                continue
+
+            average_head = children[0].head.copy()
+            for child in children[1:]:
+                average_head += child.head
+            average_head /= len(children)
+
+            if (average_head - bone.head).length <= 0.0001:
+                if ensure_nonzero_edit_bone_length(bone):
+                    fixed_zero_length += 1
+            else:
+                bone.tail = average_head
+                adjusted += 1
+                branch_adjusted += 1
+
+            for child in children:
+                child.use_connect = False
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+    return adjusted, connected, branch_adjusted, fixed_zero_length
+
+
 def delete_bone_tree(armature_obj, root_name, mode, do_apply):
     children_map = get_children_map(armature_obj)
     parent_map = get_parent_map(armature_obj)
@@ -280,7 +425,7 @@ def compute_simplify_delete_set(children_map, root_name, keep_every):
     return delete_set
 
 
-def simplify_bone_chain(armature_obj, root_name, keep_every, do_apply):
+def simplify_bone_chain(armature_obj, root_name, keep_every, reconnect_tails, connect_single_children, do_apply):
     children_map = get_children_map(armature_obj)
     parent_map = get_parent_map(armature_obj)
     if root_name not in parent_map:
@@ -298,6 +443,8 @@ def simplify_bone_chain(armature_obj, root_name, keep_every, do_apply):
             "root": root_name,
             "deleted_bones": delete_names,
             "branch_nodes": branch_nodes,
+            "reconnect_tails": reconnect_tails,
+            "connect_single_children": connect_single_children,
             "affected_vertices": 0,
         }
 
@@ -312,12 +459,27 @@ def simplify_bone_chain(armature_obj, root_name, keep_every, do_apply):
         affected_vertices += affected
         remove_single_bone_graft_children(armature_obj, bone_name)
 
+    adjusted_tails = 0
+    connected_children = 0
+    branch_adjusted = 0
+    fixed_zero_length = 0
+    if reconnect_tails:
+        adjusted_tails, connected_children, branch_adjusted, fixed_zero_length = reconnect_simplified_chain_tails(
+            armature_obj,
+            root_name,
+            connect_single_children,
+        )
+
     return {
         "mesh": armature_obj.name,
         "root": root_name,
         "deleted_bones": delete_names,
         "merged_groups": sorted(merged_groups),
         "branch_nodes": branch_nodes,
+        "adjusted_tails": adjusted_tails,
+        "connected_children": connected_children,
+        "branch_adjusted": branch_adjusted,
+        "fixed_zero_length": fixed_zero_length,
         "affected_vertices": affected_vertices,
     }
 
@@ -390,6 +552,74 @@ def cleanup_hair_tip_placeholders(armature_obj, patterns, merge_weighted, mode, 
     }
 
 
+def merge_parallel_bone_chains(armature_obj, selected_names, active_name, target_mode, match_mode, length_tolerance, do_apply):
+    children_map = get_children_map(armature_obj)
+    parent_map = get_parent_map(armature_obj)
+    selected_roots = filter_selected_root_bones(selected_names, parent_map)
+
+    if len(selected_roots) < 2:
+        raise RuntimeError("Select at least two parallel chain roots.")
+
+    target_root = choose_parallel_target_root(selected_roots, active_name, target_mode)
+    chains = {root_name: collect_linear_chain(children_map, root_name) for root_name in selected_roots}
+    target_chain = chains[target_root]
+    target_len = len(target_chain)
+
+    skipped_roots = []
+    merge_pairs = []
+    source_roots = []
+
+    for root_name in selected_roots:
+        if root_name == target_root:
+            continue
+
+        source_chain = chains[root_name]
+        if abs(len(source_chain) - target_len) > length_tolerance:
+            skipped_roots.append(root_name)
+            continue
+
+        source_roots.append(root_name)
+        merge_pairs.extend(build_parallel_merge_pairs(source_chain, target_chain, match_mode))
+
+    if not merge_pairs:
+        raise RuntimeError("No compatible source chains found for parallel merge.")
+
+    if not do_apply:
+        return {
+            "mesh": armature_obj.name,
+            "root": target_root,
+            "selected_roots": selected_roots,
+            "source_roots": source_roots,
+            "skipped_roots": skipped_roots,
+            "target_chain": target_chain,
+            "merge_pairs": [f"{source} -> {target}" for source, target in merge_pairs],
+            "deleted_bones": [bone_name for root_name in source_roots for bone_name in chains[root_name]],
+            "affected_vertices": 0,
+        }
+
+    affected_vertices = 0
+    merged_groups = set()
+    for source_name, target_name in merge_pairs:
+        groups, affected = merge_groups_to_target(armature_obj, [source_name], target_name)
+        merged_groups.update(groups)
+        affected_vertices += affected
+
+    deleted_bones = remove_bones_subtree(armature_obj, source_roots)
+
+    return {
+        "mesh": armature_obj.name,
+        "root": target_root,
+        "selected_roots": selected_roots,
+        "source_roots": source_roots,
+        "skipped_roots": skipped_roots,
+        "target_chain": target_chain,
+        "merge_pairs": [f"{source} -> {target}" for source, target in merge_pairs],
+        "merged_groups": sorted(merged_groups),
+        "deleted_bones": deleted_bones,
+        "affected_vertices": affected_vertices,
+    }
+
+
 def print_bone_report(title, report, sections):
     common.print_report(title, [report], sections)
     if "root" in report:
@@ -441,16 +671,83 @@ class KKVRC_OT_simplify_selected_bone_chain(bpy.types.Operator):
         try:
             armature_obj = get_active_armature(context)
             root_name = get_active_bone_name(context, armature_obj)
-            report = simplify_bone_chain(armature_obj, root_name, props.cleanup_simplify_keep_every, do_apply)
+            report = simplify_bone_chain(
+                armature_obj,
+                root_name,
+                props.cleanup_simplify_keep_every,
+                props.cleanup_reconnect_simplified_chain,
+                props.cleanup_connect_single_child_bones,
+                do_apply,
+            )
         except Exception as ex:
             self.report({"ERROR"}, str(ex))
             common.set_status(context, f"Bone simplify failed: {ex}")
             return {"CANCELLED"}
 
         title = "Simplify Physical Bone Chain Applied" if do_apply else "Simplify Physical Bone Chain Preview"
-        print_bone_report(title, report, (("deleted_bones", "Deleted bones"), ("merged_groups", "Merged groups"), ("branch_nodes", "Preserved branch nodes")))
+        print_bone_report(
+            title,
+            report,
+            (
+                ("deleted_bones", "Deleted bones"),
+                ("merged_groups", "Merged groups"),
+                ("branch_nodes", "Preserved branch nodes"),
+                ("adjusted_tails", "Adjusted bone tails"),
+                ("connected_children", "Connected single-child bones"),
+                ("branch_adjusted", "Adjusted branch display bones"),
+                ("fixed_zero_length", "Fixed zero-length bones"),
+            ),
+        )
         self.report({"INFO"}, f"{'Simplified' if do_apply else 'Previewed'} {len(report['deleted_bones'])} removable bone(s).")
         common.set_status(context, f"Bone simplify {'applied' if do_apply else 'preview'}: {len(report['deleted_bones'])} bone(s)")
+        return {"FINISHED"}
+
+
+class KKVRC_OT_merge_selected_parallel_bone_chains(bpy.types.Operator):
+    bl_idname = "kkvrc.merge_selected_parallel_bone_chains"
+    bl_label = "Merge Selected Parallel Bone Chains"
+    bl_description = "Merge selected parallel physical bone chains and their weights into one selected target chain"
+    bl_options = {"REGISTER", "UNDO"}
+
+    action: bpy.props.EnumProperty(items=(("PREVIEW", "Preview", ""), ("APPLY", "Apply", "")), default="PREVIEW", options={"HIDDEN"})
+
+    def execute(self, context):
+        props = context.scene.kkvrc_cloth_tools
+        do_apply = self.action == "APPLY"
+        try:
+            armature_obj = get_active_armature(context)
+            selected_names = get_selected_bone_names(context, armature_obj)
+            active_name = get_active_bone_name(context, armature_obj)
+            report = merge_parallel_bone_chains(
+                armature_obj,
+                selected_names,
+                active_name,
+                props.cleanup_parallel_merge_target,
+                props.cleanup_parallel_merge_match,
+                props.cleanup_parallel_merge_tolerance,
+                do_apply,
+            )
+        except Exception as ex:
+            self.report({"ERROR"}, str(ex))
+            common.set_status(context, f"Parallel chain merge failed: {ex}")
+            return {"CANCELLED"}
+
+        title = "Parallel Bone Chain Merge Applied" if do_apply else "Parallel Bone Chain Merge Preview"
+        print_bone_report(
+            title,
+            report,
+            (
+                ("selected_roots", "Selected roots"),
+                ("source_roots", "Merged source roots"),
+                ("skipped_roots", "Skipped roots"),
+                ("target_chain", "Target chain"),
+                ("merge_pairs", "Merge pairs"),
+                ("merged_groups", "Merged groups"),
+                ("deleted_bones", "Deleted bones"),
+            ),
+        )
+        self.report({"INFO"}, f"{'Merged' if do_apply else 'Previewed'} {len(report['source_roots'])} parallel chain(s).")
+        common.set_status(context, f"Parallel chain merge {'applied' if do_apply else 'preview'}: {len(report['source_roots'])} chain(s)")
         return {"FINISHED"}
 
 
