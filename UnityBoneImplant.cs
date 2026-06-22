@@ -8,6 +8,7 @@ public class AutoBoneImplantProcess : EditorWindow
 {
     private const string DefaultPrefixes =
         "skirt_,sleeve_,ribbon_,cape_,tail_,hair_,cloth_,add_,vrc_,acc_,breast_,belt_";
+    private static readonly Vector3 DefaultDynamicBoneForce = new Vector3(0f, -0.001f, 0f);
 
     private GameObject rootObject;
     private bool usePrefixFilter;
@@ -20,6 +21,8 @@ public class AutoBoneImplantProcess : EditorWindow
     private string hairRootMarkers = "root";
     private string hairNameMarkers = "hair";
     private bool hairUseBranchFallback = true;
+    private bool hairSuppressNestedDynamicBoneRoots = true;
+    private int hairMinDynamicBoneChainDepth = 1;
     private bool hairRequireSkinnedBoneEvidence = true;
     private bool hairIgnoreExistingDynamicBones = true;
     private string customPrefixes = DefaultPrefixes;
@@ -282,6 +285,14 @@ public class AutoBoneImplantProcess : EditorWindow
         hairUseBranchFallback = EditorGUILayout.ToggleLeft(
             "Fallback: count from unbranched chain starts",
             hairUseBranchFallback);
+        hairSuppressNestedDynamicBoneRoots = EditorGUILayout.ToggleLeft(
+            "Suppress nested hair Dynamic Bone roots",
+            hairSuppressNestedDynamicBoneRoots);
+        hairMinDynamicBoneChainDepth = EditorGUILayout.IntField(
+            "Skip roots with max chain depth <=",
+            hairMinDynamicBoneChainDepth);
+        if (hairMinDynamicBoneChainDepth < 0)
+            hairMinDynamicBoneChainDepth = 0;
         hairRequireSkinnedBoneEvidence = EditorGUILayout.ToggleLeft(
             "Require SkinnedMeshRenderer bone evidence",
             hairRequireSkinnedBoneEvidence);
@@ -393,6 +404,10 @@ public class AutoBoneImplantProcess : EditorWindow
             }
         }
 
+        if (hairSuppressNestedDynamicBoneRoots)
+            SuppressNestedHairCandidates();
+        SuppressShortHairCandidates();
+
         Debug.Log("Hair DynamicBone preview found " + hairPreview.Count + " candidate(s).");
     }
 
@@ -408,6 +423,108 @@ public class AutoBoneImplantProcess : EditorWindow
         }
 
         hairPreview.Add(candidate);
+    }
+
+    private void SuppressNestedHairCandidates()
+    {
+        hairPreview.Sort(CompareHairCandidateDepth);
+
+        List<HairDynamicBoneCandidate> filtered = new List<HairDynamicBoneCandidate>();
+        foreach (HairDynamicBoneCandidate candidate in hairPreview)
+        {
+            if (candidate == null || candidate.Root == null)
+                continue;
+
+            bool isNested = false;
+            foreach (HairDynamicBoneCandidate kept in filtered)
+            {
+                if (kept == null || kept.Root == null)
+                    continue;
+
+                if (IsDescendantOf(candidate.Root, kept.Root))
+                {
+                    isNested = true;
+                    break;
+                }
+            }
+
+            if (!isNested)
+                filtered.Add(candidate);
+        }
+
+        hairPreview = filtered;
+    }
+
+    private void SuppressShortHairCandidates()
+    {
+        if (hairMinDynamicBoneChainDepth <= 0)
+            return;
+
+        List<HairDynamicBoneCandidate> filtered = new List<HairDynamicBoneCandidate>();
+        foreach (HairDynamicBoneCandidate candidate in hairPreview)
+        {
+            if (candidate == null || candidate.Root == null)
+                continue;
+
+            int maxDepth = GetMaxDescendantDepthIncludingSelf(candidate.Root);
+            if (maxDepth <= hairMinDynamicBoneChainDepth)
+                continue;
+
+            filtered.Add(candidate);
+        }
+
+        hairPreview = filtered;
+    }
+
+    private static int GetMaxDescendantDepthIncludingSelf(Transform root)
+    {
+        if (root == null)
+            return 0;
+
+        int maxChildDepth = 0;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            maxChildDepth = Math.Max(maxChildDepth, GetMaxDescendantDepthIncludingSelf(child));
+        }
+
+        return maxChildDepth + 1;
+    }
+
+    private static int CompareHairCandidateDepth(HairDynamicBoneCandidate left, HairDynamicBoneCandidate right)
+    {
+        int leftDepth = left != null && left.Root != null ? GetTransformDepth(left.Root) : int.MaxValue;
+        int rightDepth = right != null && right.Root != null ? GetTransformDepth(right.Root) : int.MaxValue;
+        return leftDepth.CompareTo(rightDepth);
+    }
+
+    private static int GetTransformDepth(Transform transform)
+    {
+        int depth = 0;
+        Transform current = transform;
+        while (current != null)
+        {
+            depth++;
+            current = current.parent;
+        }
+
+        return depth;
+    }
+
+    private static bool IsDescendantOf(Transform child, Transform potentialAncestor)
+    {
+        if (child == null || potentialAncestor == null)
+            return false;
+
+        Transform current = child.parent;
+        while (current != null)
+        {
+            if (current == potentialAncestor)
+                return true;
+            current = current.parent;
+        }
+
+        return false;
     }
 
     private ImplantCandidate TryCreateCandidate(
@@ -699,9 +816,43 @@ public class AutoBoneImplantProcess : EditorWindow
         }
 
         rootField.SetValue(comp, root);
+        ApplyDynamicBonePreset(dynamicBoneType, comp);
         EditorUtility.SetDirty(hostObject);
         Debug.Log("DynamicBone on " + hostObject.name + ": root " + root.name);
         return true;
+    }
+
+    private static void ApplyDynamicBonePreset(Type dynamicBoneType, Component comp)
+    {
+        SetVector3Field(dynamicBoneType, comp, "m_Force", "Force", DefaultDynamicBoneForce);
+    }
+
+    private static bool SetVector3Field(
+        Type componentType,
+        Component comp,
+        string primaryFieldName,
+        string fallbackFieldName,
+        Vector3 value)
+    {
+        FieldInfo field = FindField(componentType, primaryFieldName);
+        if (field == null)
+            field = FindField(componentType, fallbackFieldName);
+
+        if (field == null || field.FieldType != typeof(Vector3))
+            return false;
+
+        field.SetValue(comp, value);
+        return true;
+    }
+
+    private static FieldInfo FindField(Type componentType, string fieldName)
+    {
+        if (componentType == null || string.IsNullOrEmpty(fieldName))
+            return null;
+
+        return componentType.GetField(
+            fieldName,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
     }
 
     private Component FindExistingDynamicBone(Type dynamicBoneType, GameObject hostObject, Transform root)
