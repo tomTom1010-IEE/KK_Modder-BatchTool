@@ -4,6 +4,10 @@ from bpy.app.translations import pgettext_iface as iface_
 from . import common
 
 
+SHOW_BODY_WEIGHT_MAPPING_UI = False
+SHOW_BREAST_WEIGHT_TOOLS_UI = False
+
+
 class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
     graft_include_priority_1: bpy.props.BoolProperty(name="Priority 1 torso/skirt roots", default=True)
     graft_include_priority_2: bpy.props.BoolProperty(name="Priority 2 breast/upper-clothes roots", default=False)
@@ -196,12 +200,25 @@ class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
         default=0.05,
         min=0.0,
         max=1.0,
-        description="After manual Data Transfer, vertices above this clothing-dynamic weight keep dynamic influence and body weights fill only the remaining capacity",
+        description="Dynamic-bone weight threshold used for overlap reporting and optional capacity scaling",
     )
-    manual_skirt_ignore_leg_weights: bpy.props.BoolProperty(
-        name="Remove leg/foot/S-D lower body weights",
-        default=True,
-        description="Remove thigh, leg, foot, toe, knee, and lower-body S/D weights from skirt-like clothes while preserving siri weights",
+    manual_transfer_region: bpy.props.EnumProperty(
+        name="Postprocess Region",
+        items=(
+            ("TORSO", "Torso Dynamic", "Keep torso, waist, bust, shoulder, and siri weights; remove unrelated arm/leg weights"),
+            ("ARM", "Arm Dynamic", "Keep shoulder, arm, forearm, hand, and finger weights; remove unrelated torso/leg weights"),
+            ("LEG", "Leg Dynamic", "Keep hips, waist, siri, thigh, leg, foot, and toe weights; remove unrelated upper-body weights"),
+        ),
+        default="TORSO",
+    )
+    manual_transfer_overlap_mode: bpy.props.EnumProperty(
+        name="Dynamic overlap mode",
+        items=(
+            ("KEEP_BODY", "Keep transferred body weights", "Only filter unrelated bones; do not scale body weights by dynamic-bone influence"),
+            ("FIT_CAPACITY", "Fit body weights to remaining capacity", "Scale body weights to 1 minus clothing dynamic weight"),
+            ("SCALE_OVERWEIGHT", "Scale only if overweight", "Scale body weights only when body plus dynamic weights exceed 1"),
+        ),
+        default="KEEP_BODY",
     )
     manual_skirt_normalize_affected_only: bpy.props.BoolProperty(
         name="Normalize affected vertices only",
@@ -233,6 +250,14 @@ class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
     cleanup_bnip_normalize_affected: bpy.props.BoolProperty(
         name="Normalize affected vertices only",
         default=True,
+    )
+    cleanup_detach_dynamic_mode: bpy.props.EnumProperty(
+        name="Detach dynamic bones by",
+        items=(
+            ("SELECTED_BONES", "Selected root bones", "Detach the selected root bones and their full subtrees"),
+            ("SELECTED_MESHES", "Selected mesh weights", "Detach dynamic bone subtrees used by selected mesh vertex groups"),
+        ),
+        default="SELECTED_BONES",
     )
     cleanup_delete_mode: bpy.props.EnumProperty(
         name="Bone delete mode",
@@ -384,6 +409,18 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
             box.prop(props, "graft_delete_vrc_armature")
             action_buttons(box, "kkvrc.graft_clothes_bones", "SCAN", "APPLY", "REPORT", "Report Roots")
 
+            draw_section_title(box, "Unity Dynamic Bone Root Markers")
+            box.label(text="Select bones in Pose/Edit Mode, then append the explicit Unity marker.")
+            box.operator("kkvrc.mark_selected_dynamic_bone_roots", text="Add _TOMDBR to Selected Bones", icon="BONE_DATA")
+
+            draw_section_title(box, "Detach Dynamic Bone Subtrees")
+            box.prop(props, "cleanup_detach_dynamic_mode")
+            row = box.row(align=True)
+            op = row.operator("kkvrc.detach_dynamic_bone_subtrees", text="Preview")
+            op.action = "PREVIEW"
+            op = row.operator("kkvrc.detach_dynamic_bone_subtrees", text="Apply")
+            op.action = "APPLY"
+
             draw_section_title(box, "Delete Selected Bone Chain/Subtree")
             box.prop(props, "cleanup_delete_mode")
             row = box.row(align=True)
@@ -422,7 +459,10 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
             op = row.operator("kkvrc.cleanup_hair_tip_placeholders", text="Apply")
             op.action = "APPLY"
 
-        box = draw_foldout_section(layout, props, "ui_show_body_weights", "Body Weight Mapping", "Step 2 / 3 / 5")
+        if SHOW_BODY_WEIGHT_MAPPING_UI:
+            box = draw_foldout_section(layout, props, "ui_show_body_weights", "Body Weight Mapping", "Step 2 / 3 / 5")
+        else:
+            box = None
         if box:
             box.label(text="Step 2 - Remap Low-Risk Body Groups")
             box.prop(props, "body_normalize_after_apply")
@@ -451,7 +491,10 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
             box.prop(props, "transfer_max_distance")
             action_buttons(box, "kkvrc.transfer_body_weights_to_fitted_clothes")
 
-        box = draw_foldout_section(layout, props, "ui_show_breast_weights", "Breast Weight Tools", "Step 4A / 4B")
+        if SHOW_BREAST_WEIGHT_TOOLS_UI:
+            box = draw_foldout_section(layout, props, "ui_show_breast_weights", "Breast Weight Tools", "Step 4A / 4B")
+        else:
+            box = None
         if box:
             box.label(text="Step 4A - Breast Simple Remap")
             box.prop(props, "breast_simple_mode")
@@ -485,11 +528,12 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
             box.label(text="Step 5B - Postprocess Manual Weight Transfer")
             box.label(text="Run Blender Data Transfer first, then use these cleanup tools.")
             box.separator()
-            box.label(text="Skirt / Dynamic Bone Protection")
-            box.label(text="Protect clothing dynamic bones and remove lower-body leg/foot weights from skirt areas.")
+            box.label(text="Region-Based Dynamic Bone Protection")
+            box.label(text="After manual Data Transfer, keep useful fitted body weights and remove unrelated region weights.")
             box.prop(props, "transfer_source_body_mesh")
+            box.prop(props, "manual_transfer_region")
+            box.prop(props, "manual_transfer_overlap_mode")
             box.prop(props, "manual_skirt_dynamic_threshold")
-            box.prop(props, "manual_skirt_ignore_leg_weights")
             box.prop(props, "manual_skirt_normalize_affected_only")
             box.prop(props, "manual_skirt_smooth_iterations")
             action_buttons(box, "kkvrc.postprocess_manual_skirt_weights", "PREVIEW", "APPLY", "REPORT", "Report Postprocess")

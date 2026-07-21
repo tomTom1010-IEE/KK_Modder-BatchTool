@@ -17,12 +17,22 @@ public class AutoBoneImplantProcess : EditorWindow
     private bool addDynamicBoneComponents;
     private bool ignoreExistingDynamicBones = true;
     private DynamicBoneBindMode dynamicBoneBindMode = DynamicBoneBindMode.ImplantRoots;
+    private int dynamicBoneChildLevel = 1;
+    private bool dynamicBoneBindExplicitSuffixMarkers;
+    private string dynamicBoneExplicitSuffixMarkers = "_TOMDBR";
+    private bool dynamicBoneBindRootMarkerLevel;
+    private string dynamicBoneRootMarkers = "root";
+    private string dynamicBoneNameMarkers = "";
+    private int dynamicBoneRootMarkerLevel = 1;
+    private bool dynamicBoneRequireSkinnedBoneEvidence = true;
     private int hairDynamicBoneLevel = 1;
     private string hairRootMarkers = "root";
     private string hairNameMarkers = "hair";
     private bool hairUseBranchFallback = true;
     private bool hairSuppressNestedDynamicBoneRoots = true;
     private int hairMinDynamicBoneChainDepth = 1;
+    private bool hairUseExplicitSuffixMarkers;
+    private string hairExplicitSuffixMarkers = "_TOMDBR";
     private bool hairRequireSkinnedBoneEvidence = true;
     private bool hairIgnoreExistingDynamicBones = true;
     private string customPrefixes = DefaultPrefixes;
@@ -271,7 +281,42 @@ public class AutoBoneImplantProcess : EditorWindow
         addDynamicBoneComponents = EditorGUILayout.ToggleLeft("Add/Update Dynamic Bone components after implant", addDynamicBoneComponents);
 
         EditorGUI.BeginDisabledGroup(!addDynamicBoneComponents);
-        dynamicBoneBindMode = (DynamicBoneBindMode)EditorGUILayout.EnumPopup("Bind Roots", dynamicBoneBindMode);
+        DynamicBoneBindMode[] bindModeValues =
+        {
+            DynamicBoneBindMode.ImplantRoots,
+            DynamicBoneBindMode.FirstLevelChildren
+        };
+        string[] bindModeLabels = { "Implant Roots", "N Level Children" };
+        int bindModeIndex = dynamicBoneBindMode == DynamicBoneBindMode.FirstLevelChildren ? 1 : 0;
+        bindModeIndex = EditorGUILayout.Popup("Bind Roots", bindModeIndex, bindModeLabels);
+        dynamicBoneBindMode = bindModeValues[bindModeIndex];
+        if (dynamicBoneBindMode == DynamicBoneBindMode.FirstLevelChildren)
+        {
+            dynamicBoneChildLevel = EditorGUILayout.IntField("Child level after implant root", dynamicBoneChildLevel);
+            if (dynamicBoneChildLevel < 1)
+                dynamicBoneChildLevel = 1;
+        }
+        dynamicBoneBindExplicitSuffixMarkers = EditorGUILayout.ToggleLeft(
+            "Also bind explicit suffix roots",
+            dynamicBoneBindExplicitSuffixMarkers);
+        EditorGUI.BeginDisabledGroup(!dynamicBoneBindExplicitSuffixMarkers);
+        dynamicBoneExplicitSuffixMarkers = EditorGUILayout.TextField(
+            "Explicit suffix markers",
+            dynamicBoneExplicitSuffixMarkers);
+        EditorGUI.EndDisabledGroup();
+        dynamicBoneBindRootMarkerLevel = EditorGUILayout.ToggleLeft(
+            "Also bind Root-marker level roots",
+            dynamicBoneBindRootMarkerLevel);
+        EditorGUI.BeginDisabledGroup(!dynamicBoneBindRootMarkerLevel);
+        dynamicBoneRootMarkers = EditorGUILayout.TextField("Root markers", dynamicBoneRootMarkers);
+        dynamicBoneNameMarkers = EditorGUILayout.TextField("Name markers", dynamicBoneNameMarkers);
+        dynamicBoneRootMarkerLevel = EditorGUILayout.IntField("Bind level after nearest root", dynamicBoneRootMarkerLevel);
+        if (dynamicBoneRootMarkerLevel < 1)
+            dynamicBoneRootMarkerLevel = 1;
+        dynamicBoneRequireSkinnedBoneEvidence = EditorGUILayout.ToggleLeft(
+            "Require SkinnedMeshRenderer bone evidence",
+            dynamicBoneRequireSkinnedBoneEvidence);
+        EditorGUI.EndDisabledGroup();
         ignoreExistingDynamicBones = EditorGUILayout.ToggleLeft("Skip existing Dynamic Bone roots", ignoreExistingDynamicBones);
         EditorGUI.EndDisabledGroup();
 
@@ -293,6 +338,14 @@ public class AutoBoneImplantProcess : EditorWindow
             hairMinDynamicBoneChainDepth);
         if (hairMinDynamicBoneChainDepth < 0)
             hairMinDynamicBoneChainDepth = 0;
+        hairUseExplicitSuffixMarkers = EditorGUILayout.ToggleLeft(
+            "Bind bones marked by explicit suffix",
+            hairUseExplicitSuffixMarkers);
+        EditorGUI.BeginDisabledGroup(!hairUseExplicitSuffixMarkers);
+        hairExplicitSuffixMarkers = EditorGUILayout.TextField(
+            "Explicit suffix markers",
+            hairExplicitSuffixMarkers);
+        EditorGUI.EndDisabledGroup();
         hairRequireSkinnedBoneEvidence = EditorGUILayout.ToggleLeft(
             "Require SkinnedMeshRenderer bone evidence",
             hairRequireSkinnedBoneEvidence);
@@ -378,35 +431,51 @@ public class AutoBoneImplantProcess : EditorWindow
         HashSet<Transform> skinnedBones = CollectSkinnedBones(rootObject);
         string[] rootMarkers = ParsePrefixes(hairRootMarkers);
         string[] nameMarkers = ParsePrefixes(hairNameMarkers);
+        string[] explicitSuffixMarkers = ParsePrefixes(hairExplicitSuffixMarkers);
         Transform[] allTransforms = rootObject.GetComponentsInChildren<Transform>(true);
 
-        foreach (Transform bone in allTransforms)
-        {
-            HairDynamicBoneCandidate candidate = TryCreateHairDynamicBoneCandidate(
-                bone,
-                dynamicBoneType,
-                skinnedBones,
-                rootMarkers,
-                nameMarkers);
-            AddUniqueHairCandidate(candidate);
-        }
-
-        if (hairUseBranchFallback)
+        if (hairUseExplicitSuffixMarkers)
         {
             foreach (Transform bone in allTransforms)
             {
-                HairDynamicBoneCandidate candidate = TryCreateHairFallbackDynamicBoneCandidate(
+                HairDynamicBoneCandidate candidate = TryCreateExplicitHairDynamicBoneCandidate(
                     bone,
                     dynamicBoneType,
                     skinnedBones,
-                    nameMarkers);
+                    explicitSuffixMarkers);
                 AddUniqueHairCandidate(candidate);
             }
         }
+        else
+        {
+            foreach (Transform bone in allTransforms)
+            {
+                HairDynamicBoneCandidate candidate = TryCreateHairDynamicBoneCandidate(
+                    bone,
+                    dynamicBoneType,
+                    skinnedBones,
+                    rootMarkers,
+                    nameMarkers);
+                AddUniqueHairCandidate(candidate);
+            }
 
-        if (hairSuppressNestedDynamicBoneRoots)
-            SuppressNestedHairCandidates();
-        SuppressShortHairCandidates();
+            if (hairUseBranchFallback)
+            {
+                foreach (Transform bone in allTransforms)
+                {
+                    HairDynamicBoneCandidate candidate = TryCreateHairFallbackDynamicBoneCandidate(
+                        bone,
+                        dynamicBoneType,
+                        skinnedBones,
+                        nameMarkers);
+                    AddUniqueHairCandidate(candidate);
+                }
+            }
+
+            if (hairSuppressNestedDynamicBoneRoots)
+                SuppressNestedHairCandidates();
+            SuppressShortHairCandidates();
+        }
 
         Debug.Log("Hair DynamicBone preview found " + hairPreview.Count + " candidate(s).");
     }
@@ -419,7 +488,14 @@ public class AutoBoneImplantProcess : EditorWindow
         foreach (HairDynamicBoneCandidate existing in hairPreview)
         {
             if (existing != null && existing.Root == candidate.Root)
+            {
+                if (candidate.IsExplicitMarker && !existing.IsExplicitMarker)
+                {
+                    int index = hairPreview.IndexOf(existing);
+                    hairPreview[index] = candidate;
+                }
                 return;
+            }
         }
 
         hairPreview.Add(candidate);
@@ -434,6 +510,12 @@ public class AutoBoneImplantProcess : EditorWindow
         {
             if (candidate == null || candidate.Root == null)
                 continue;
+
+            if (candidate.IsExplicitMarker)
+            {
+                filtered.Add(candidate);
+                continue;
+            }
 
             bool isNested = false;
             foreach (HairDynamicBoneCandidate kept in filtered)
@@ -465,6 +547,12 @@ public class AutoBoneImplantProcess : EditorWindow
         {
             if (candidate == null || candidate.Root == null)
                 continue;
+
+            if (candidate.IsExplicitMarker)
+            {
+                filtered.Add(candidate);
+                continue;
+            }
 
             int maxDepth = GetMaxDescendantDepthIncludingSelf(candidate.Root);
             if (maxDepth <= hairMinDynamicBoneChainDepth)
@@ -597,6 +685,7 @@ public class AutoBoneImplantProcess : EditorWindow
         int dynamicAdded = 0;
         int dynamicSkipped = 0;
         int dynamicFailed = 0;
+        List<Transform> dynamicRoots = new List<Transform>();
 
         foreach (ImplantCandidate candidate in preview)
         {
@@ -609,12 +698,16 @@ public class AutoBoneImplantProcess : EditorWindow
                 failed++;
 
             if (addDynamicBoneComponents && dynamicBoneType != null)
-            {
-                DynamicBoneApplyResult result = AddDynamicBonesForCandidate(dynamicBoneType, rootObject, candidate.Source);
-                dynamicAdded += result.AddedOrUpdated;
-                dynamicSkipped += result.Skipped;
-                dynamicFailed += result.Failed;
-            }
+                AddUniqueDynamicRoots(dynamicRoots, GetDynamicBoneRoots(candidate.Source));
+        }
+
+        if (addDynamicBoneComponents && dynamicBoneType != null)
+        {
+            AddExtraDynamicBoneRoots(dynamicBoneType, dynamicRoots);
+            DynamicBoneApplyResult result = AddDynamicBonesForRoots(dynamicBoneType, rootObject, dynamicRoots, ignoreExistingDynamicBones);
+            dynamicAdded += result.AddedOrUpdated;
+            dynamicSkipped += result.Skipped;
+            dynamicFailed += result.Failed;
         }
 
         EditorUtility.SetDirty(rootObject);
@@ -707,7 +800,10 @@ public class AutoBoneImplantProcess : EditorWindow
 
         if (hairPreview.Count == 0)
         {
-            EditorGUILayout.HelpBox("Scan to preview hair Dynamic Bone roots found by nearest Root marker and level.", MessageType.Info);
+            string help = hairUseExplicitSuffixMarkers
+                ? "Scan to preview bones whose names end with an explicit Dynamic Bone suffix marker."
+                : "Scan to preview hair Dynamic Bone roots found by nearest Root marker and level.";
+            EditorGUILayout.HelpBox(help, MessageType.Info);
             return;
         }
 
@@ -720,18 +816,30 @@ public class AutoBoneImplantProcess : EditorWindow
 
             string evidence = candidate.HasSkinnedBoneEvidence ? "weighted/descendant weighted" : "no renderer evidence";
             string existing = candidate.HasExistingDynamicBone ? ", existing DynamicBone" : "";
-            EditorGUILayout.LabelField(
-                candidate.Root.name +
-                " <- " +
-                candidate.SourceLabel +
-                " " +
-                candidate.NearestRoot.name +
-                ", level " +
-                candidate.Level +
-                " (" +
-                evidence +
-                existing +
-                ")");
+            if (candidate.IsExplicitMarker)
+            {
+                EditorGUILayout.LabelField(
+                    candidate.Root.name +
+                    " <- explicit suffix marker (" +
+                    evidence +
+                    existing +
+                    ")");
+            }
+            else
+            {
+                EditorGUILayout.LabelField(
+                    candidate.Root.name +
+                    " <- " +
+                    candidate.SourceLabel +
+                    " " +
+                    candidate.NearestRoot.name +
+                    ", level " +
+                    candidate.Level +
+                    " (" +
+                    evidence +
+                    existing +
+                    ")");
+            }
         }
 
         EditorGUILayout.EndScrollView();
@@ -772,16 +880,23 @@ public class AutoBoneImplantProcess : EditorWindow
 
     private DynamicBoneApplyResult AddDynamicBonesForCandidate(Type dynamicBoneType, GameObject hostObject, Transform implantRoot)
     {
-        DynamicBoneApplyResult result = new DynamicBoneApplyResult();
-        List<Transform> roots = GetDynamicBoneRoots(implantRoot);
+        return AddDynamicBonesForRoots(dynamicBoneType, hostObject, GetDynamicBoneRoots(implantRoot), ignoreExistingDynamicBones);
+    }
 
+    private DynamicBoneApplyResult AddDynamicBonesForRoots(
+        Type dynamicBoneType,
+        GameObject hostObject,
+        IEnumerable<Transform> roots,
+        bool skipExisting)
+    {
+        DynamicBoneApplyResult result = new DynamicBoneApplyResult();
         foreach (Transform root in roots)
         {
             if (root == null)
                 continue;
 
             Component existing = FindExistingDynamicBone(dynamicBoneType, hostObject, root);
-            if (existing != null && ignoreExistingDynamicBones)
+            if (existing != null && skipExisting)
             {
                 result.Skipped++;
                 continue;
@@ -794,6 +909,92 @@ public class AutoBoneImplantProcess : EditorWindow
         }
 
         return result;
+    }
+
+    private void AddExtraDynamicBoneRoots(Type dynamicBoneType, List<Transform> roots)
+    {
+        if (rootObject == null || roots == null)
+            return;
+
+        HashSet<Transform> skinnedBones = CollectSkinnedBones(rootObject);
+        Transform[] allTransforms = rootObject.GetComponentsInChildren<Transform>(true);
+
+        if (dynamicBoneBindExplicitSuffixMarkers)
+        {
+            string[] suffixMarkers = ParsePrefixes(dynamicBoneExplicitSuffixMarkers);
+            foreach (Transform bone in allTransforms)
+            {
+                if (bone == null || !HasAnySuffixMarker(bone.name, suffixMarkers))
+                    continue;
+
+                if (ignoreExistingDynamicBones && FindExistingDynamicBone(dynamicBoneType, rootObject, bone) != null)
+                    continue;
+
+                AddUniqueDynamicRoot(roots, bone);
+            }
+        }
+
+        if (dynamicBoneBindRootMarkerLevel)
+        {
+            string[] rootMarkers = ParsePrefixes(dynamicBoneRootMarkers);
+            string[] nameMarkers = ParsePrefixes(dynamicBoneNameMarkers);
+            foreach (Transform bone in allTransforms)
+            {
+                if (!IsDynamicRootMarkerLevelCandidate(bone, skinnedBones, rootMarkers, nameMarkers))
+                    continue;
+
+                if (ignoreExistingDynamicBones && FindExistingDynamicBone(dynamicBoneType, rootObject, bone) != null)
+                    continue;
+
+                AddUniqueDynamicRoot(roots, bone);
+            }
+        }
+    }
+
+    private bool IsDynamicRootMarkerLevelCandidate(
+        Transform bone,
+        HashSet<Transform> skinnedBones,
+        string[] rootMarkers,
+        string[] nameMarkers)
+    {
+        if (bone == null || bone.parent == null)
+            return false;
+
+        if (IsRootMarkerName(bone.name, rootMarkers))
+            return false;
+
+        Transform nearestRoot = FindNearestRootMarkerAncestor(bone, rootMarkers);
+        if (nearestRoot == null)
+            return false;
+
+        if (!HasHairNameMarkerBetween(nearestRoot, bone, nameMarkers))
+            return false;
+
+        int level = GetAncestorDistance(bone, nearestRoot);
+        if (level != dynamicBoneRootMarkerLevel)
+            return false;
+
+        if (dynamicBoneRequireSkinnedBoneEvidence && !HasBoneEvidence(bone, skinnedBones))
+            return false;
+
+        return true;
+    }
+
+    private static void AddUniqueDynamicRoots(List<Transform> roots, IEnumerable<Transform> newRoots)
+    {
+        if (newRoots == null)
+            return;
+
+        foreach (Transform root in newRoots)
+            AddUniqueDynamicRoot(roots, root);
+    }
+
+    private static void AddUniqueDynamicRoot(List<Transform> roots, Transform root)
+    {
+        if (roots == null || root == null || roots.Contains(root))
+            return;
+
+        roots.Add(root);
     }
 
     private bool AddOrUpdateDynamicBone(Type dynamicBoneType, GameObject hostObject, Transform root, Component existing)
@@ -876,6 +1077,31 @@ public class AutoBoneImplantProcess : EditorWindow
         }
 
         return null;
+    }
+
+    private HairDynamicBoneCandidate TryCreateExplicitHairDynamicBoneCandidate(
+        Transform bone,
+        Type dynamicBoneType,
+        HashSet<Transform> skinnedBones,
+        string[] suffixMarkers)
+    {
+        if (bone == null || !HasAnySuffixMarker(bone.name, suffixMarkers))
+            return null;
+
+        bool hasExistingDynamicBone = dynamicBoneType != null && FindExistingDynamicBone(dynamicBoneType, rootObject, bone) != null;
+        if (hairIgnoreExistingDynamicBones && hasExistingDynamicBone)
+            return null;
+
+        return new HairDynamicBoneCandidate
+        {
+            Root = bone,
+            NearestRoot = bone,
+            Level = 0,
+            SourceLabel = "explicit suffix",
+            HasSkinnedBoneEvidence = HasBoneEvidence(bone, skinnedBones),
+            HasExistingDynamicBone = hasExistingDynamicBone,
+            IsExplicitMarker = true
+        };
     }
 
     private HairDynamicBoneCandidate TryCreateHairDynamicBoneCandidate(
@@ -1037,6 +1263,22 @@ public class AutoBoneImplantProcess : EditorWindow
         return false;
     }
 
+    private static bool HasAnySuffixMarker(string name, string[] markers)
+    {
+        if (string.IsNullOrEmpty(name) || markers == null || markers.Length == 0)
+            return false;
+
+        foreach (string marker in markers)
+        {
+            if (string.IsNullOrEmpty(marker))
+                continue;
+            if (name.EndsWith(marker, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
     private static bool HasAnyNameMarker(string name, string[] markers)
     {
         if (string.IsNullOrEmpty(name) || markers == null)
@@ -1074,14 +1316,30 @@ public class AutoBoneImplantProcess : EditorWindow
             return roots;
         }
 
-        for (int i = 0; i < implantRoot.childCount; i++)
-        {
-            Transform child = implantRoot.GetChild(i);
-            if (child != null)
-                roots.Add(child);
-        }
-
+        CollectDescendantsAtDepth(implantRoot, dynamicBoneChildLevel, roots);
         return roots;
+    }
+
+    private static void CollectDescendantsAtDepth(Transform root, int depth, List<Transform> results)
+    {
+        if (root == null || results == null || depth < 1)
+            return;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child == null)
+                continue;
+
+            if (depth == 1)
+            {
+                results.Add(child);
+            }
+            else
+            {
+                CollectDescendantsAtDepth(child, depth - 1, results);
+            }
+        }
     }
 
     private int CountDynamicRoots(Transform implantRoot)
@@ -1232,6 +1490,7 @@ public class AutoBoneImplantProcess : EditorWindow
         public string SourceLabel;
         public bool HasSkinnedBoneEvidence;
         public bool HasExistingDynamicBone;
+        public bool IsExplicitMarker;
     }
 
     private struct DynamicBoneApplyResult

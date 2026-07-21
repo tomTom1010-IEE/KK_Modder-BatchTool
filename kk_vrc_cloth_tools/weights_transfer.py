@@ -3,6 +3,7 @@ from mathutils.bvhtree import BVHTree
 from mathutils.kdtree import KDTree
 
 from . import common
+from . import bone_rules
 
 
 VRC_HUMANOID_GROUPS = {
@@ -60,7 +61,6 @@ VRC_HUMANOID_GROUPS = {
 }
 
 DATA_TRANSFER_MODIFIER_NAME = "__KKVRC_NATIVE_BODY_WEIGHT_SAMPLE__"
-BNIP_GROUP_PREFIXES = ("cf_j_bnip", "cf_s_bnip", "cf_d_bnip")
 BNIP_FALLBACK_GROUPS = (
     "cf_j_bust03_L",
     "cf_j_bust03_R",
@@ -279,7 +279,7 @@ def collect_source_vertex_weights(source_body, kk_bone_names):
     group_names_by_index = {
         group.index: group.name
         for group in source_body.vertex_groups
-        if group.name in kk_bone_names
+        if group.name in kk_bone_names and bone_rules.is_kk_standard_body_bone(group.name)
     }
     weights = []
     for vertex in source_body.data.vertices:
@@ -296,7 +296,9 @@ def collect_source_body_group_names(source_body, kk_bone_names):
     return {
         group.name
         for group in source_body.vertex_groups
-        if group.name in kk_bone_names and common.group_has_weights(source_body, group.index)
+        if group.name in kk_bone_names
+        and bone_rules.is_kk_standard_body_bone(group.name)
+        and common.group_has_weights(source_body, group.index)
     }
 
 
@@ -319,11 +321,11 @@ def get_dynamic_weight_total(obj, vertex, body_group_names, treat_vrc_humanoid_a
     return total
 
 
-def get_physical_weight_total(obj, vertex, kk_bone_names, treat_vrc_humanoid_as_body):
+def get_physical_weight_total(obj, vertex, body_group_names, treat_vrc_humanoid_as_body):
     total = 0.0
     for group_ref in vertex.groups:
         group = obj.vertex_groups[group_ref.group]
-        if group.name in kk_bone_names:
+        if bone_rules.is_body_weight_group(group.name, body_group_names):
             continue
         if is_replaceable_non_kk_group(group.name, treat_vrc_humanoid_as_body):
             continue
@@ -344,16 +346,16 @@ def clear_named_weights(obj, vertex_index, group_names):
     return removed
 
 
-def clear_body_weights(obj, vertex_index, kk_bone_names):
+def clear_body_weights(obj, vertex_index, body_group_names):
     for group in list(obj.vertex_groups):
-        if group.name in kk_bone_names:
+        if bone_rules.is_body_weight_group(group.name, body_group_names):
             common.remove_vertex_from_group(group, vertex_index)
 
 
-def clear_replaceable_non_kk_weights(obj, vertex_index, kk_bone_names, treat_vrc_humanoid_as_body):
+def clear_replaceable_non_kk_weights(obj, vertex_index, body_group_names, treat_vrc_humanoid_as_body):
     removed = []
     for group in list(obj.vertex_groups):
-        if group.name in kk_bone_names:
+        if bone_rules.is_body_weight_group(group.name, body_group_names):
             continue
         if not is_replaceable_non_kk_group(group.name, treat_vrc_humanoid_as_body):
             continue
@@ -386,7 +388,7 @@ def transfer_body_weights(
     transferred_weights = transfer_source_body_weights_to_target(source_body, target, body_group_names)
 
     for vertex in target.data.vertices:
-        physical_total = get_physical_weight_total(target, vertex, kk_bone_names, treat_vrc_humanoid_as_body)
+        physical_total = get_physical_weight_total(target, vertex, body_group_names, treat_vrc_humanoid_as_body)
         if physical_total > physical_threshold:
             protected_physical += 1
 
@@ -413,13 +415,13 @@ def transfer_body_weights(
             continue
 
         if replace_body_weights:
-            clear_body_weights(target, vertex.index, kk_bone_names)
+            clear_body_weights(target, vertex.index, body_group_names)
             if remove_replaced_non_kk_groups:
                 removed_non_kk_groups.update(
                     clear_replaceable_non_kk_weights(
                         target,
                         vertex.index,
-                        kk_bone_names,
+                        body_group_names,
                         treat_vrc_humanoid_as_body,
                     )
                 )
@@ -621,7 +623,7 @@ def swap_lr_vertex_group_weights(target, do_apply, remove_empty_groups_after):
 
 
 def is_bnip_group_name(name):
-    return name.startswith(BNIP_GROUP_PREFIXES)
+    return bone_rules.is_nipple_detail_bone(name)
 
 
 def choose_bnip_fallback_group(target, side):

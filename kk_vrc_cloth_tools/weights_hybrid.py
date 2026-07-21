@@ -3,6 +3,7 @@ from collections import deque
 import bpy
 
 from . import common
+from . import bone_rules
 from . import weights_body
 from . import weights_transfer
 
@@ -31,28 +32,7 @@ VRC_TO_KK_HYBRID_GROUPS.update(
     }
 )
 
-LOWER_BODY_LIMB_PREFIXES = (
-    "cf_j_thigh",
-    "cf_j_leg",
-    "cf_j_foot",
-    "cf_j_toes",
-    "cf_j_kokan",
-    "cf_d_thigh",
-    "cf_d_leg",
-    "cf_d_knee",
-    "cf_d_foot",
-    "cf_d_toes",
-    "cf_d_kokan",
-    "cf_s_thigh",
-    "cf_s_leg",
-    "cf_s_knee",
-    "cf_s_foot",
-    "cf_s_toes",
-    "cf_s_kokan",
-)
-
 SKIRT_FALLBACK_GROUPS = ("cf_j_hips", "cf_j_waist02", "cf_j_waist01")
-
 
 def get_weight_total(obj, vertex, group_names):
     total = 0.0
@@ -67,7 +47,7 @@ def get_dynamic_weight_total(obj, vertex, body_group_names):
     total = 0.0
     for group_ref in vertex.groups:
         group = obj.vertex_groups[group_ref.group]
-        if group.name in body_group_names:
+        if bone_rules.is_body_weight_group(group.name, body_group_names):
             continue
         if group.name in REPLACEABLE_VRC_GROUPS:
             continue
@@ -106,11 +86,46 @@ def scale_weights_to_capacity(weights, capacity):
 
 
 def is_lower_body_limb_group(group_name):
-    return group_name.startswith(LOWER_BODY_LIMB_PREFIXES)
+    return bone_rules.is_lower_body_limb_bone(group_name)
 
 
 def remove_lower_body_limb_weights(weights):
     return {name: weight for name, weight in weights.items() if not is_lower_body_limb_group(name)}
+
+
+def is_torso_related_group(group_name):
+    return bone_rules.is_transfer_region_bone(group_name, bone_rules.TRANSFER_REGION_TORSO)
+
+
+def is_arm_related_group(group_name):
+    return bone_rules.is_transfer_region_bone(group_name, bone_rules.TRANSFER_REGION_ARM)
+
+
+def is_leg_related_group(group_name):
+    return bone_rules.is_transfer_region_bone(group_name, bone_rules.TRANSFER_REGION_LEG)
+
+
+def is_relevant_group_for_region(group_name, region):
+    return bone_rules.is_transfer_region_bone(group_name, region)
+
+
+def get_irrelevant_body_groups_for_region(group_names, region):
+    return bone_rules.irrelevant_groups_for_region(group_names, region)
+
+
+def filter_body_weights_for_region(weights, region):
+    kept = bone_rules.filter_groups_for_region(weights.keys(), region, weights.keys())
+    return {name: weight for name, weight in weights.items() if name in kept}
+
+
+def get_dynamic_overlap_capacity(current_weights, dynamic_total, overlap_mode):
+    body_total = sum(current_weights.values())
+    if overlap_mode == "FIT_CAPACITY":
+        return max(0.0, 1.0 - dynamic_total)
+    if overlap_mode == "SCALE_OVERWEIGHT":
+        if body_total + dynamic_total > 1.0:
+            return max(0.0, 1.0 - dynamic_total)
+    return body_total
 
 
 def filter_skirt_body_weights(weights, kk_bone_names):
@@ -256,14 +271,14 @@ def smooth_body_weights(target, affected_vertices, body_group_names, iterations)
     )
 
 
-def normalize_body_weights_preserve_dynamic(target, affected_vertices, body_group_names):
+def normalize_body_weights_preserve_dynamic(target, affected_vertices, relevant_body_group_names):
     for vertex_index in affected_vertices:
         vertex = target.data.vertices[vertex_index]
-        dynamic_total = get_dynamic_weight_total(target, vertex, body_group_names)
+        dynamic_total = get_dynamic_weight_total(target, vertex, relevant_body_group_names)
         capacity = max(0.0, 1.0 - dynamic_total)
 
         current = {}
-        for group_name in body_group_names:
+        for group_name in relevant_body_group_names:
             group = target.vertex_groups.get(group_name)
             if group is None:
                 continue
@@ -299,20 +314,23 @@ def remove_body_weights_from_vertex(target, vertex_index, body_group_names):
     return removed
 
 
-def postprocess_manual_skirt_weights(
+def postprocess_manual_transfer_weights(
     target,
     body_group_names,
     do_apply,
+    region,
     dynamic_threshold,
-    ignore_leg_weights,
+    overlap_mode,
     normalize_affected,
     smooth_iterations,
 ):
     affected_vertices = set()
+    relevant_body_group_names = bone_rules.filter_groups_for_region(body_group_names, region, body_group_names)
     used_groups = set()
     removed_groups = set()
-    dynamic_protected_vertices = 0
-    leg_filtered_vertices = 0
+    dynamic_overlap_vertices = 0
+    region_filtered_vertices = 0
+    capacity_scaled_vertices = 0
     emptied_vertices = 0
 
     for vertex in target.data.vertices:
@@ -321,19 +339,18 @@ def postprocess_manual_skirt_weights(
             continue
 
         dynamic_total = get_dynamic_weight_total(target, vertex, body_group_names)
-        protected = dynamic_total > dynamic_threshold
-        if protected:
-            dynamic_protected_vertices += 1
+        if dynamic_total > dynamic_threshold:
+            dynamic_overlap_vertices += 1
 
-        result = dict(current_weights)
-        if ignore_leg_weights:
-            filtered = remove_lower_body_limb_weights(result)
-            if len(filtered) != len(result):
-                leg_filtered_vertices += 1
-            result = filtered
+        result = filter_body_weights_for_region(current_weights, region)
+        if len(result) != len(current_weights):
+            region_filtered_vertices += 1
 
-        capacity = max(0.0, 1.0 - dynamic_total) if protected else sum(result.values())
-        result = scale_weights_to_capacity(result, capacity)
+        capacity = get_dynamic_overlap_capacity(result, dynamic_total, overlap_mode)
+        scaled = scale_weights_to_capacity(result, capacity)
+        if scaled != result:
+            capacity_scaled_vertices += 1
+        result = scaled
 
         if result == current_weights:
             continue
@@ -351,9 +368,9 @@ def postprocess_manual_skirt_weights(
                 common.set_weight(target, group_name, vertex.index, weight)
 
     if do_apply and smooth_iterations > 0 and affected_vertices:
-        smooth_body_weights(target, affected_vertices, body_group_names, smooth_iterations)
+        smooth_body_weights(target, affected_vertices, relevant_body_group_names, smooth_iterations)
 
-    if do_apply and normalize_affected:
+    if do_apply and normalize_affected and overlap_mode != "KEEP_BODY":
         normalize_body_weights_preserve_dynamic(target, affected_vertices, body_group_names)
 
     if do_apply and removed_groups:
@@ -364,22 +381,46 @@ def postprocess_manual_skirt_weights(
         "affected_vertices": len(affected_vertices),
         "used_groups": sorted(used_groups),
         "removed_groups": sorted(removed_groups),
-        "dynamic_protected_vertices": dynamic_protected_vertices,
-        "leg_filtered_vertices": leg_filtered_vertices,
+        "dynamic_overlap_vertices": dynamic_overlap_vertices,
+        "region_filtered_vertices": region_filtered_vertices,
+        "capacity_scaled_vertices": capacity_scaled_vertices,
         "emptied_vertices": emptied_vertices,
     }
 
 
-def get_manual_skirt_body_group_names(target, body_group_names, kk_bone_names, ignore_leg_weights):
-    names = set(body_group_names)
-    if ignore_leg_weights:
-        names.update(
-            group.name
-            for group in target.vertex_groups
-            if group.name in kk_bone_names and is_lower_body_limb_group(group.name)
-        )
-    return names
+def postprocess_manual_skirt_weights(
+    target,
+    body_group_names,
+    do_apply,
+    dynamic_threshold,
+    ignore_leg_weights,
+    normalize_affected,
+    smooth_iterations,
+):
+    region = "TORSO" if ignore_leg_weights else "TORSO"
+    return postprocess_manual_transfer_weights(
+        target,
+        body_group_names,
+        do_apply,
+        region,
+        dynamic_threshold,
+        "FIT_CAPACITY",
+        normalize_affected,
+        smooth_iterations,
+    )
 
+
+def get_manual_transfer_body_group_names(target, body_group_names, kk_bone_names, region):
+    # Only groups proven to exist on the source KK body mesh are treated as body weights.
+    # The target armature also contains grafted clothing dynamic bones, so expanding from
+    # kk_bone_names would accidentally delete custom physical groups during postprocess.
+    return set(body_group_names)
+
+
+def get_manual_skirt_body_group_names(target, body_group_names, kk_bone_names, ignore_leg_weights):
+    if ignore_leg_weights:
+        return get_manual_transfer_body_group_names(target, body_group_names, kk_bone_names, "TORSO")
+    return set(body_group_names)
 
 def make_transfer_candidate(sampled_source_weights):
     return source_transfer_weights(sampled_source_weights)
@@ -685,8 +726,8 @@ class KKVRC_OT_auto_hybrid_clothes_weights(bpy.types.Operator):
 
 class KKVRC_OT_postprocess_manual_skirt_weights(bpy.types.Operator):
     bl_idname = "kkvrc.postprocess_manual_skirt_weights"
-    bl_label = "Postprocess Manual Skirt Weights"
-    bl_description = "After manual Blender Data Transfer, protect clothing dynamic bones and filter unsafe lower-body skirt weights"
+    bl_label = "Postprocess Manual Transfer Weights"
+    bl_description = "After manual Blender Data Transfer, filter unrelated body weights by dynamic-bone region"
     bl_options = {"REGISTER", "UNDO"}
 
     action: bpy.props.EnumProperty(
@@ -712,26 +753,27 @@ class KKVRC_OT_postprocess_manual_skirt_weights(bpy.types.Operator):
 
         do_apply = self.action == "APPLY"
         reports = [
-            postprocess_manual_skirt_weights(
+            postprocess_manual_transfer_weights(
                 target,
-                get_manual_skirt_body_group_names(
+                get_manual_transfer_body_group_names(
                     target,
                     body_group_names,
                     kk_bone_names,
-                    props.manual_skirt_ignore_leg_weights,
+                    props.manual_transfer_region,
                 ),
                 do_apply,
+                props.manual_transfer_region,
                 props.manual_skirt_dynamic_threshold,
-                props.manual_skirt_ignore_leg_weights,
+                props.manual_transfer_overlap_mode,
                 props.manual_skirt_normalize_affected_only,
                 props.manual_skirt_smooth_iterations,
             )
             for target in targets
         ]
 
-        title = "Manual Skirt Weight Postprocess Applied" if do_apply else "Manual Skirt Weight Postprocess Preview"
+        title = "Manual Transfer Weight Postprocess Applied" if do_apply else "Manual Transfer Weight Postprocess Preview"
         if self.action == "REPORT":
-            title = "Manual Skirt Weight Postprocess Report"
+            title = "Manual Transfer Weight Postprocess Report"
 
         common.print_report(
             title,
@@ -739,12 +781,13 @@ class KKVRC_OT_postprocess_manual_skirt_weights(bpy.types.Operator):
             (
                 ("used_groups", "Remaining KK body groups"),
                 ("removed_groups", "Removed/filtered body groups"),
-                ("dynamic_protected_vertices", "Dynamic-protected vertices"),
-                ("leg_filtered_vertices", "Leg/foot-filtered vertices"),
+                ("dynamic_overlap_vertices", "Dynamic-overlap vertices"),
+                ("region_filtered_vertices", "Region-filtered vertices"),
+                ("capacity_scaled_vertices", "Capacity-scaled vertices"),
                 ("emptied_vertices", "Vertices left to dynamic only"),
             ),
         )
-        message = f"{'Applied' if do_apply else 'Previewed'} manual skirt postprocess for {len(targets)} mesh(es)."
+        message = f"{'Applied' if do_apply else 'Previewed'} manual transfer postprocess for {len(targets)} mesh(es)."
         self.report({"INFO"}, message + " See console.")
         common.set_status(context, message)
         return {"FINISHED"}

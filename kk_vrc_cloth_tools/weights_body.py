@@ -1,6 +1,7 @@
 import bpy
 
 from . import common
+from . import bone_rules
 
 
 VRC_TO_KK_BODY_GROUPS = {
@@ -54,11 +55,8 @@ VRC_TO_KK_BODY_GROUPS = {
     "Little Distal.R": "cf_j_little03_R",
 }
 
-KK_STANDARD_BONE_PREFIXES = ("cf_j_", "cf_d_", "cf_s_")
-
-
 def is_kk_standard_bone_name(name):
-    return name.startswith(KK_STANDARD_BONE_PREFIXES)
+    return bone_rules.is_kk_standard_body_bone(name)
 
 
 def merge_vertex_groups(obj, source_group, target_group):

@@ -11,6 +11,8 @@ bl_info = {
 if "bpy" in locals():
     import importlib
     from . import common
+    from . import bone_rules
+    from . import vrc_bone_rules
     from . import graft
     from . import weights_body
     from . import weights_torso
@@ -23,10 +25,12 @@ if "bpy" in locals():
     from . import translations
     from . import ui
 
-    for _module in (common, graft, weights_body, weights_torso, weights_breast, weights_transfer, weights_hybrid, glove_align, bone_cleanup, topology_export, translations, ui):
+    for _module in (common, bone_rules, vrc_bone_rules, graft, weights_body, weights_torso, weights_breast, weights_transfer, weights_hybrid, glove_align, bone_cleanup, topology_export, translations, ui):
         importlib.reload(_module)
 else:
     from . import common
+    from . import bone_rules
+    from . import vrc_bone_rules
     from . import graft
     from . import weights_body
     from . import weights_torso
@@ -57,6 +61,8 @@ CLASSES = (
     weights_hybrid.KKVRC_OT_auto_hybrid_clothes_weights,
     weights_hybrid.KKVRC_OT_postprocess_manual_skirt_weights,
     glove_align.KKVRC_OT_align_vrc_glove_pose_to_kk,
+    bone_cleanup.KKVRC_OT_detach_dynamic_bone_subtrees,
+    bone_cleanup.KKVRC_OT_mark_selected_dynamic_bone_roots,
     bone_cleanup.KKVRC_OT_delete_selected_bone_tree,
     bone_cleanup.KKVRC_OT_simplify_selected_bone_chain,
     bone_cleanup.KKVRC_OT_merge_selected_parallel_bone_chains,

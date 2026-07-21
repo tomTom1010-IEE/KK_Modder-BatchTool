@@ -5,9 +5,13 @@ import bpy
 from mathutils import Vector
 
 from . import common
+from . import bone_rules
+from . import vrc_bone_rules
 
 
 DEFAULT_HAIR_TIP_PATTERNS = "CYCRHair*_tip,*Hair*_tip,*_tip"
+UNITY_DYNAMIC_BONE_ROOT_SUFFIX = "_TOMDBR"
+BLENDER_NAME_MAX_BYTES = 63
 
 
 def get_active_armature(context):
@@ -42,6 +46,97 @@ def get_selected_bone_names(context, armature_obj):
 
     active = armature_obj.data.bones.active
     return [active.name] if active else []
+
+
+def append_suffix_with_byte_limit(name, suffix, max_bytes=BLENDER_NAME_MAX_BYTES):
+    available = max_bytes - len(suffix.encode("utf-8"))
+    if available <= 0:
+        raise RuntimeError("Bone marker suffix is too long for a Blender name.")
+
+    encoded = name.encode("utf-8")[:available]
+    while encoded:
+        try:
+            base = encoded.decode("utf-8")
+            break
+        except UnicodeDecodeError:
+            encoded = encoded[:-1]
+    else:
+        base = ""
+
+    return base + suffix
+
+
+def mark_selected_bones_as_dynamic_roots(context, suffix=UNITY_DYNAMIC_BONE_ROOT_SUFFIX):
+    armature_obj = get_active_armature(context)
+    selected_names = get_selected_bone_names(context, armature_obj)
+    if not selected_names:
+        raise RuntimeError("Select at least one bone in Pose Mode or Edit Mode.")
+
+    existing_names = {bone.name for bone in armature_obj.data.bones}
+    meshes = get_armature_meshes(armature_obj)
+    rename_pairs = []
+    already_marked = []
+    conflicts = []
+
+    for old_name in selected_names:
+        if old_name.endswith(suffix):
+            already_marked.append(old_name)
+            continue
+
+        new_name = append_suffix_with_byte_limit(old_name, suffix)
+        if new_name in existing_names:
+            conflicts.append(f"{old_name} -> {new_name} (bone name exists)")
+            continue
+
+        vertex_group_conflict = any(
+            mesh.vertex_groups.get(old_name) is not None
+            and mesh.vertex_groups.get(new_name) is not None
+            for mesh in meshes
+        )
+        if vertex_group_conflict:
+            conflicts.append(f"{old_name} -> {new_name} (vertex group name exists)")
+            continue
+
+        existing_names.discard(old_name)
+        existing_names.add(new_name)
+        rename_pairs.append((old_name, new_name))
+
+    renamed = []
+    renamed_vertex_groups = []
+    bone_collection = (
+        armature_obj.data.edit_bones
+        if context.mode == "EDIT_ARMATURE"
+        else armature_obj.data.bones
+    )
+
+    for old_name, new_name in rename_pairs:
+        bone = bone_collection.get(old_name)
+        if bone is None:
+            conflicts.append(f"{old_name} -> {new_name} (bone no longer found)")
+            continue
+
+        bone.name = new_name
+        actual_name = bone.name
+        if actual_name != new_name:
+            conflicts.append(f"{old_name} -> {actual_name} (Blender changed target name)")
+            continue
+
+        renamed.append(f"{old_name} -> {new_name}")
+        for mesh in meshes:
+            old_group = mesh.vertex_groups.get(old_name)
+            if old_group is None:
+                continue
+            if mesh.vertex_groups.get(new_name) is None:
+                old_group.name = new_name
+            renamed_vertex_groups.append(f"{mesh.name}: {old_name} -> {new_name}")
+
+    return {
+        "mesh": armature_obj.name,
+        "renamed": renamed,
+        "renamed_vertex_groups": renamed_vertex_groups,
+        "already_marked": already_marked,
+        "conflicts": conflicts,
+    }
 
 
 def get_children_map(armature_obj):
@@ -620,6 +715,230 @@ def merge_parallel_bone_chains(armature_obj, selected_names, active_name, target
     }
 
 
+def get_armature_for_selected_mesh_detach(context):
+    if common.is_armature(context.view_layer.objects.active):
+        return context.view_layer.objects.active
+
+    armatures = set()
+    for mesh in context.selected_objects:
+        if not common.is_mesh(mesh):
+            continue
+        if common.is_armature(mesh.parent):
+            armatures.add(mesh.parent)
+        for modifier in mesh.modifiers:
+            if modifier.type == "ARMATURE" and common.is_armature(modifier.object):
+                armatures.add(modifier.object)
+
+    if len(armatures) == 1:
+        return next(iter(armatures))
+
+    if not armatures:
+        raise RuntimeError("Select the source Armature, or select mesh(es) with an Armature modifier.")
+    raise RuntimeError("Selected meshes reference multiple Armatures. Make the source Armature active.")
+
+
+def make_unique_object_name(base_name):
+    if base_name not in bpy.data.objects:
+        return base_name
+
+    index = 1
+    while True:
+        candidate = f"{base_name}.{index:03d}"
+        if candidate not in bpy.data.objects:
+            return candidate
+        index += 1
+
+
+def get_meshes_weighted_by_bones(armature_obj, bone_names, selected_meshes=None):
+    bone_names = set(bone_names)
+    meshes = selected_meshes if selected_meshes is not None else get_armature_meshes(armature_obj)
+    result = []
+
+    for mesh in meshes:
+        if not common.is_mesh(mesh):
+            continue
+        for bone_name in bone_names:
+            group = mesh.vertex_groups.get(bone_name)
+            if group is not None and common.group_has_weights(mesh, group.index):
+                result.append(mesh)
+                break
+
+    return sorted(set(result), key=lambda obj: obj.name)
+
+
+def collect_weighted_bone_group_names(meshes, armature_obj):
+    armature_bones = {bone.name for bone in armature_obj.data.bones}
+    names = set()
+
+    for mesh in meshes:
+        if not common.is_mesh(mesh):
+            continue
+        for vertex_group in mesh.vertex_groups:
+            if vertex_group.name not in armature_bones:
+                continue
+            if common.group_has_weights(mesh, vertex_group.index):
+                names.add(vertex_group.name)
+
+    return names
+
+
+def collect_detach_roots_from_meshes(armature_obj, meshes):
+    parent_map = get_parent_map(armature_obj)
+    weighted_names = collect_weighted_bone_group_names(meshes, armature_obj)
+    dynamic_weighted = [
+        name
+        for name in weighted_names
+        if not bone_rules.is_kk_standard_body_bone(name) and not vrc_bone_rules.is_vrc_graft_stop_bone(name)
+    ]
+    roots = []
+
+    for bone_name in sorted(dynamic_weighted):
+        current = bone_name
+        parent_name = parent_map.get(current)
+        while (
+            parent_name
+            and not bone_rules.is_kk_standard_body_bone(parent_name)
+            and not vrc_bone_rules.is_vrc_graft_stop_bone(parent_name)
+        ):
+            current = parent_name
+            parent_name = parent_map.get(current)
+        roots.append(current)
+
+    return filter_selected_root_bones(sorted(set(roots)), parent_map), sorted(dynamic_weighted)
+
+
+def create_detached_armature_from_subtrees(source_armature, root_names):
+    children_map = get_children_map(source_armature)
+    detach_bones = []
+    seen = set()
+    for root_name in root_names:
+        for bone_name in collect_subtree_names(children_map, root_name):
+            if bone_name not in seen:
+                seen.add(bone_name)
+                detach_bones.append(bone_name)
+
+    new_data = bpy.data.armatures.new(make_unique_object_name(f"{source_armature.data.name}_DetachedDynamic"))
+    new_obj = bpy.data.objects.new(make_unique_object_name(f"{source_armature.name}_DetachedDynamic"), new_data)
+    source_collection = source_armature.users_collection[0] if source_armature.users_collection else bpy.context.collection
+    source_collection.objects.link(new_obj)
+    new_obj.matrix_world = source_armature.matrix_world.copy()
+    new_obj.show_in_front = source_armature.show_in_front
+
+    if bpy.context.mode != "OBJECT":
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+    bpy.ops.object.select_all(action="DESELECT")
+    new_obj.select_set(True)
+    bpy.context.view_layer.objects.active = new_obj
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    try:
+        edit_bones = new_data.edit_bones
+        source_bones = source_armature.data.bones
+        for bone_name in detach_bones:
+            source_bone = source_bones.get(bone_name)
+            if source_bone is None:
+                continue
+            new_bone = edit_bones.new(bone_name)
+            new_bone.head = source_bone.head_local.copy()
+            new_bone.tail = source_bone.tail_local.copy()
+            new_bone.roll = getattr(source_bone, "roll", 0.0)
+            new_bone.use_deform = source_bone.use_deform
+            new_bone.use_connect = False
+
+        for bone_name in detach_bones:
+            source_bone = source_bones.get(bone_name)
+            new_bone = edit_bones.get(bone_name)
+            if source_bone is None or new_bone is None:
+                continue
+            if source_bone.parent and source_bone.parent.name in seen:
+                new_bone.parent = edit_bones.get(source_bone.parent.name)
+                new_bone.use_connect = source_bone.use_connect
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+    return new_obj, detach_bones
+
+
+def ensure_detached_armature_modifier(mesh_obj, detached_armature):
+    for modifier in mesh_obj.modifiers:
+        if modifier.type == "ARMATURE" and modifier.object == detached_armature:
+            return False
+
+    modifier = mesh_obj.modifiers.new(name="Detached Dynamic Bones", type="ARMATURE")
+    modifier.object = detached_armature
+    return True
+
+
+def detach_dynamic_bone_subtrees(armature_obj, root_names, selected_meshes, do_apply):
+    parent_map = get_parent_map(armature_obj)
+    children_map = get_children_map(armature_obj)
+    root_names = filter_selected_root_bones([name for name in root_names if name in parent_map], parent_map)
+
+    if not root_names:
+        raise RuntimeError("No detachable dynamic bone roots found.")
+
+    detached_bones = []
+    for root_name in root_names:
+        detached_bones.extend(collect_subtree_names(children_map, root_name))
+    detached_bones = list(dict.fromkeys(detached_bones))
+    affected_meshes = get_meshes_weighted_by_bones(armature_obj, detached_bones, selected_meshes)
+
+    if not do_apply:
+        return {
+            "mesh": armature_obj.name,
+            "roots": root_names,
+            "detached_bones": detached_bones,
+            "affected_meshes": [mesh.name for mesh in affected_meshes],
+            "new_armature": "(preview)",
+            "added_modifiers": [],
+        }
+
+    detached_armature, copied_bones = create_detached_armature_from_subtrees(armature_obj, root_names)
+    added_modifiers = []
+    for mesh in affected_meshes:
+        if ensure_detached_armature_modifier(mesh, detached_armature):
+            added_modifiers.append(mesh.name)
+
+    removed_bones = remove_bones_subtree(armature_obj, root_names)
+
+    return {
+        "mesh": armature_obj.name,
+        "roots": root_names,
+        "detached_bones": copied_bones,
+        "removed_bones": removed_bones,
+        "affected_meshes": [mesh.name for mesh in affected_meshes],
+        "new_armature": detached_armature.name,
+        "added_modifiers": added_modifiers,
+    }
+
+
+def detach_dynamic_bone_subtrees_from_selected_bones(context, armature_obj, do_apply):
+    parent_map = get_parent_map(armature_obj)
+    selected_names = get_selected_bone_names(context, armature_obj)
+    root_names = filter_selected_root_bones(selected_names, parent_map)
+    return detach_dynamic_bone_subtrees(armature_obj, root_names, None, do_apply)
+
+
+def detach_dynamic_bone_subtrees_from_selected_meshes(context, armature_obj, do_apply):
+    selected_meshes = [obj for obj in context.selected_objects if common.is_mesh(obj)]
+    if not selected_meshes:
+        raise RuntimeError("Select at least one mesh for mesh-weight based detach.")
+
+    usable_meshes = []
+    for mesh in selected_meshes:
+        if mesh in get_armature_meshes(armature_obj):
+            usable_meshes.append(mesh)
+
+    if not usable_meshes:
+        raise RuntimeError("Selected mesh(es) are not parented to, or modified by, the active Armature.")
+
+    root_names, weighted_dynamic_groups = collect_detach_roots_from_meshes(armature_obj, usable_meshes)
+    report = detach_dynamic_bone_subtrees(armature_obj, root_names, usable_meshes, do_apply)
+    report["weighted_dynamic_groups"] = weighted_dynamic_groups
+    return report
+
+
 def print_bone_report(title, report, sections):
     common.print_report(title, [report], sections)
     if "root" in report:
@@ -628,6 +947,83 @@ def print_bone_report(title, report, sections):
         print(f"  Parent bone: {report['parent']}")
     if "is_leaf" in report:
         print(f"  Is leaf: {report['is_leaf']}")
+
+
+class KKVRC_OT_detach_dynamic_bone_subtrees(bpy.types.Operator):
+    bl_idname = "kkvrc.detach_dynamic_bone_subtrees"
+    bl_label = "Detach Dynamic Bone Subtrees"
+    bl_description = "Move selected or mesh-used dynamic bone subtrees into a new Armature and remove them from the original Armature"
+    bl_options = {"REGISTER", "UNDO"}
+
+    action: bpy.props.EnumProperty(items=(("PREVIEW", "Preview", ""), ("APPLY", "Apply", "")), default="PREVIEW", options={"HIDDEN"})
+
+    def execute(self, context):
+        props = context.scene.kkvrc_cloth_tools
+        do_apply = self.action == "APPLY"
+        try:
+            if props.cleanup_detach_dynamic_mode == "SELECTED_BONES":
+                armature_obj = get_active_armature(context)
+                report = detach_dynamic_bone_subtrees_from_selected_bones(context, armature_obj, do_apply)
+            else:
+                armature_obj = get_armature_for_selected_mesh_detach(context)
+                report = detach_dynamic_bone_subtrees_from_selected_meshes(context, armature_obj, do_apply)
+        except Exception as ex:
+            self.report({"ERROR"}, str(ex))
+            common.set_status(context, f"Dynamic bone detach failed: {ex}")
+            return {"CANCELLED"}
+
+        title = "Dynamic Bone Subtree Detach Applied" if do_apply else "Dynamic Bone Subtree Detach Preview"
+        print_bone_report(
+            title,
+            report,
+            (
+                ("roots", "Detached roots"),
+                ("detached_bones", "Detached bones"),
+                ("weighted_dynamic_groups", "Weighted dynamic groups"),
+                ("affected_meshes", "Affected meshes"),
+                ("new_armature", "New Armature"),
+                ("added_modifiers", "Added Armature modifiers"),
+                ("removed_bones", "Removed from source Armature"),
+            ),
+        )
+        self.report({"INFO"}, f"{'Detached' if do_apply else 'Previewed'} {len(report['detached_bones'])} bone(s).")
+        common.set_status(context, f"Dynamic detach {'applied' if do_apply else 'preview'}: {len(report['detached_bones'])} bone(s)")
+        return {"FINISHED"}
+
+
+class KKVRC_OT_mark_selected_dynamic_bone_roots(bpy.types.Operator):
+    bl_idname = "kkvrc.mark_selected_dynamic_bone_roots"
+    bl_label = "Mark Selected Dynamic Bone Roots"
+    bl_description = "Append _TOMDBR to selected bone names for explicit Unity Dynamic Bone root binding"
+    bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return common.is_armature(context.view_layer.objects.active) and context.mode in {"POSE", "EDIT_ARMATURE"}
+
+    def execute(self, context):
+        try:
+            report = mark_selected_bones_as_dynamic_roots(context)
+        except Exception as ex:
+            self.report({"ERROR"}, str(ex))
+            common.set_status(context, f"Dynamic root marking failed: {ex}")
+            return {"CANCELLED"}
+
+        print_bone_report(
+            "Unity Dynamic Bone Root Marking",
+            report,
+            (
+                ("renamed", "Marked bones"),
+                ("renamed_vertex_groups", "Renamed vertex groups"),
+                ("already_marked", "Already marked"),
+                ("conflicts", "Skipped conflicts"),
+            ),
+        )
+        marked_count = len(report["renamed"])
+        skipped_count = len(report["already_marked"]) + len(report["conflicts"])
+        self.report({"INFO"}, f"Marked {marked_count} bone(s); skipped {skipped_count}.")
+        common.set_status(context, f"TOMDBR markers added: {marked_count}; skipped: {skipped_count}")
+        return {"FINISHED"}
 
 
 class KKVRC_OT_delete_selected_bone_tree(bpy.types.Operator):
