@@ -292,7 +292,9 @@ public class AutoBoneImplantProcess : EditorWindow
         dynamicBoneBindMode = bindModeValues[bindModeIndex];
         if (dynamicBoneBindMode == DynamicBoneBindMode.FirstLevelChildren)
         {
-            dynamicBoneChildLevel = EditorGUILayout.IntField("Child level after implant root", dynamicBoneChildLevel);
+            dynamicBoneChildLevel = EditorGUILayout.IntField(
+                new GUIContent("Child level after implant root", "Level 1 is the direct child; level 2 is the grandchild."),
+                dynamicBoneChildLevel);
             if (dynamicBoneChildLevel < 1)
                 dynamicBoneChildLevel = 1;
         }
@@ -310,7 +312,9 @@ public class AutoBoneImplantProcess : EditorWindow
         EditorGUI.BeginDisabledGroup(!dynamicBoneBindRootMarkerLevel);
         dynamicBoneRootMarkers = EditorGUILayout.TextField("Root markers", dynamicBoneRootMarkers);
         dynamicBoneNameMarkers = EditorGUILayout.TextField("Name markers", dynamicBoneNameMarkers);
-        dynamicBoneRootMarkerLevel = EditorGUILayout.IntField("Bind level after nearest root", dynamicBoneRootMarkerLevel);
+        dynamicBoneRootMarkerLevel = EditorGUILayout.IntField(
+            new GUIContent("Bind level after nearest root", "Level 1 is the direct child of the nearest matching Root node."),
+            dynamicBoneRootMarkerLevel);
         if (dynamicBoneRootMarkerLevel < 1)
             dynamicBoneRootMarkerLevel = 1;
         dynamicBoneRequireSkinnedBoneEvidence = EditorGUILayout.ToggleLeft(
@@ -324,7 +328,9 @@ public class AutoBoneImplantProcess : EditorWindow
         EditorGUILayout.LabelField("Hair Dynamic Bone", EditorStyles.boldLabel);
         hairRootMarkers = EditorGUILayout.TextField("Root markers", hairRootMarkers);
         hairNameMarkers = EditorGUILayout.TextField("Hair name markers", hairNameMarkers);
-        hairDynamicBoneLevel = EditorGUILayout.IntField("Bind level after nearest root", hairDynamicBoneLevel);
+        hairDynamicBoneLevel = EditorGUILayout.IntField(
+            new GUIContent("Bind level after nearest root", "Level 1 is the direct child. The fallback uses the same rule after an unbranched chain start."),
+            hairDynamicBoneLevel);
         if (hairDynamicBoneLevel < 1)
             hairDynamicBoneLevel = 1;
         hairUseBranchFallback = EditorGUILayout.ToggleLeft(
@@ -334,7 +340,9 @@ public class AutoBoneImplantProcess : EditorWindow
             "Suppress nested hair Dynamic Bone roots",
             hairSuppressNestedDynamicBoneRoots);
         hairMinDynamicBoneChainDepth = EditorGUILayout.IntField(
-            "Skip roots with max chain depth <=",
+            new GUIContent(
+                "Skip roots with max chain depth <=",
+                "Measured from the candidate including itself. The default 1 skips leaf-only roots; set 0 to disable."),
             hairMinDynamicBoneChainDepth);
         if (hairMinDynamicBoneChainDepth < 0)
             hairMinDynamicBoneChainDepth = 0;
@@ -467,6 +475,7 @@ public class AutoBoneImplantProcess : EditorWindow
                         bone,
                         dynamicBoneType,
                         skinnedBones,
+                        rootMarkers,
                         nameMarkers);
                     AddUniqueHairCandidate(candidate);
                 }
@@ -503,12 +512,57 @@ public class AutoBoneImplantProcess : EditorWindow
 
     private void SuppressNestedHairCandidates()
     {
+        HashSet<HairDynamicBoneCandidate> shadowedCandidates =
+            new HashSet<HairDynamicBoneCandidate>();
+
+        foreach (HairDynamicBoneCandidate outer in hairPreview)
+        {
+            if (outer == null || outer.Root == null || outer.IsExplicitMarker)
+                continue;
+
+            foreach (HairDynamicBoneCandidate inner in hairPreview)
+            {
+                if (inner == null || inner == outer || inner.Root == null || inner.NearestRoot == null ||
+                    !inner.UsesRootMarker || inner.IsExplicitMarker)
+                    continue;
+
+                // A fallback candidate can be a structural parent such as
+                // Lucid_Hair. Prefer every explicit nearest-Root candidate
+                // below it so the broad fallback cannot hide valid chains.
+                if (!outer.UsesRootMarker)
+                {
+                    if (IsDescendantOf(inner.Root, outer.Root))
+                    {
+                        shadowedCandidates.Add(outer);
+                        break;
+                    }
+                    continue;
+                }
+
+                if (outer.NearestRoot == null)
+                    continue;
+
+                bool innerMarkerIsCloser =
+                    inner.NearestRoot != outer.NearestRoot &&
+                    IsDescendantOf(inner.NearestRoot, outer.NearestRoot);
+                bool candidatesOverlap = IsDescendantOf(inner.Root, outer.Root);
+                if (innerMarkerIsCloser && candidatesOverlap)
+                {
+                    shadowedCandidates.Add(outer);
+                    break;
+                }
+            }
+        }
+
         hairPreview.Sort(CompareHairCandidateDepth);
 
         List<HairDynamicBoneCandidate> filtered = new List<HairDynamicBoneCandidate>();
         foreach (HairDynamicBoneCandidate candidate in hairPreview)
         {
             if (candidate == null || candidate.Root == null)
+                continue;
+
+            if (shadowedCandidates.Contains(candidate))
                 continue;
 
             if (candidate.IsExplicitMarker)
@@ -1143,7 +1197,8 @@ public class AutoBoneImplantProcess : EditorWindow
             Level = level,
             SourceLabel = "nearest root",
             HasSkinnedBoneEvidence = hasBoneEvidence,
-            HasExistingDynamicBone = hasExistingDynamicBone
+            HasExistingDynamicBone = hasExistingDynamicBone,
+            UsesRootMarker = true
         };
     }
 
@@ -1151,19 +1206,29 @@ public class AutoBoneImplantProcess : EditorWindow
         Transform bone,
         Type dynamicBoneType,
         HashSet<Transform> skinnedBones,
+        string[] rootMarkers,
         string[] nameMarkers)
     {
         if (bone == null || bone.parent == null)
             return null;
 
-        if (!HasHairNameMarkerBetween(bone, bone, nameMarkers))
+        // Root-marker chains are handled by the nearest-root path. Allowing the
+        // fallback to scan them creates a shallower duplicate which then hides
+        // the correct candidate during nested-root suppression.
+        if (IsRootMarkerName(bone.name, rootMarkers) ||
+            FindNearestRootMarkerAncestor(bone, rootMarkers) != null)
             return null;
 
         Transform chainStart = FindUnbranchedChainStart(bone);
         if (chainStart == null)
             return null;
 
-        int level = GetAncestorDistance(bone, chainStart) + 1;
+        if (!HasHairNameMarkerBetween(chainStart, bone, nameMarkers))
+            return null;
+
+        // Level is the number of parent-child edges after the chain start:
+        // level 1 is its direct child, level 2 is the grandchild, and so on.
+        int level = GetAncestorDistance(bone, chainStart);
         if (level != hairDynamicBoneLevel)
             return null;
 
@@ -1491,6 +1556,7 @@ public class AutoBoneImplantProcess : EditorWindow
         public bool HasSkinnedBoneEvidence;
         public bool HasExistingDynamicBone;
         public bool IsExplicitMarker;
+        public bool UsesRootMarker;
     }
 
     private struct DynamicBoneApplyResult

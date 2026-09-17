@@ -48,6 +48,79 @@ def get_selected_bone_names(context, armature_obj):
     return [active.name] if active else []
 
 
+def capture_armature_interaction(context, armature_obj):
+    active_bone = getattr(context, "active_bone", None) or armature_obj.data.bones.active
+    return {
+        "mode": context.mode,
+        "selected_bones": get_selected_bone_names(context, armature_obj),
+        "active_bone": active_bone.name if active_bone else None,
+        "active_parent": active_bone.parent.name if active_bone and active_bone.parent else None,
+    }
+
+
+def restore_armature_interaction(context, armature_obj, state, fallback_names=()):
+    if not state or state.get("mode") not in {"POSE", "EDIT_ARMATURE"}:
+        return None
+
+    try:
+        if context.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+
+        bpy.ops.object.select_all(action="DESELECT")
+        armature_obj.select_set(True)
+        context.view_layer.objects.active = armature_obj
+
+        target_mode = "POSE" if state["mode"] == "POSE" else "EDIT"
+        bpy.ops.object.mode_set(mode=target_mode)
+
+        surviving_selected = [
+            name
+            for name in state.get("selected_bones", ())
+            if name in armature_obj.data.bones
+        ]
+        fallback_candidates = [
+            name
+            for name in (
+                state.get("active_bone"),
+                *fallback_names,
+                state.get("active_parent"),
+            )
+            if name and name in armature_obj.data.bones
+        ]
+        active_name = fallback_candidates[0] if fallback_candidates else None
+        if active_name is None and surviving_selected:
+            active_name = surviving_selected[0]
+        if not surviving_selected and active_name:
+            surviving_selected = [active_name]
+
+        if target_mode == "POSE":
+            for bone in armature_obj.data.bones:
+                bone.select = False
+            for name in surviving_selected:
+                armature_obj.data.bones[name].select = True
+            if active_name:
+                armature_obj.data.bones.active = armature_obj.data.bones[active_name]
+        else:
+            edit_bones = armature_obj.data.edit_bones
+            for bone in edit_bones:
+                bone.select = False
+                bone.select_head = False
+                bone.select_tail = False
+            for name in surviving_selected:
+                bone = edit_bones.get(name)
+                if bone is None:
+                    continue
+                bone.select = True
+                bone.select_head = True
+                bone.select_tail = True
+            if active_name and edit_bones.get(active_name):
+                edit_bones.active = edit_bones[active_name]
+    except Exception as ex:
+        return str(ex)
+
+    return None
+
+
 def append_suffix_with_byte_limit(name, suffix, max_bytes=BLENDER_NAME_MAX_BYTES):
     available = max_bytes - len(suffix.encode("utf-8"))
     if available <= 0:
@@ -960,17 +1033,28 @@ class KKVRC_OT_detach_dynamic_bone_subtrees(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.kkvrc_cloth_tools
         do_apply = self.action == "APPLY"
+        armature_obj = None
+        interaction_state = None
         try:
             if props.cleanup_detach_dynamic_mode == "SELECTED_BONES":
                 armature_obj = get_active_armature(context)
+                interaction_state = capture_armature_interaction(context, armature_obj)
                 report = detach_dynamic_bone_subtrees_from_selected_bones(context, armature_obj, do_apply)
             else:
                 armature_obj = get_armature_for_selected_mesh_detach(context)
+                interaction_state = capture_armature_interaction(context, armature_obj)
                 report = detach_dynamic_bone_subtrees_from_selected_meshes(context, armature_obj, do_apply)
         except Exception as ex:
+            restore_error = restore_armature_interaction(context, armature_obj, interaction_state) if armature_obj else None
+            if restore_error:
+                print(f"Could not restore Armature interaction mode: {restore_error}")
             self.report({"ERROR"}, str(ex))
             common.set_status(context, f"Dynamic bone detach failed: {ex}")
             return {"CANCELLED"}
+
+        restore_error = restore_armature_interaction(context, armature_obj, interaction_state)
+        if restore_error:
+            self.report({"WARNING"}, f"Operation succeeded, but mode restore failed: {restore_error}")
 
         title = "Dynamic Bone Subtree Detach Applied" if do_apply else "Dynamic Bone Subtree Detach Preview"
         print_bone_report(
@@ -1037,14 +1121,24 @@ class KKVRC_OT_delete_selected_bone_tree(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.kkvrc_cloth_tools
         do_apply = self.action == "APPLY"
+        armature_obj = None
+        interaction_state = None
         try:
             armature_obj = get_active_armature(context)
+            interaction_state = capture_armature_interaction(context, armature_obj)
             root_name = get_active_bone_name(context, armature_obj)
             report = delete_bone_tree(armature_obj, root_name, props.cleanup_delete_mode, do_apply)
         except Exception as ex:
+            restore_error = restore_armature_interaction(context, armature_obj, interaction_state) if armature_obj else None
+            if restore_error:
+                print(f"Could not restore Armature interaction mode: {restore_error}")
             self.report({"ERROR"}, str(ex))
             common.set_status(context, f"Bone delete failed: {ex}")
             return {"CANCELLED"}
+
+        restore_error = restore_armature_interaction(context, armature_obj, interaction_state, (report.get("parent"),))
+        if restore_error:
+            self.report({"WARNING"}, f"Operation succeeded, but mode restore failed: {restore_error}")
 
         title = "Delete Bone Chain/Subtree Applied" if do_apply else "Delete Bone Chain/Subtree Preview"
         print_bone_report(title, report, (("deleted_bones", "Deleted bones"), ("merged_groups", "Merged groups"), ("grafted_children", "Grafted children")))
@@ -1064,8 +1158,11 @@ class KKVRC_OT_simplify_selected_bone_chain(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.kkvrc_cloth_tools
         do_apply = self.action == "APPLY"
+        armature_obj = None
+        interaction_state = None
         try:
             armature_obj = get_active_armature(context)
+            interaction_state = capture_armature_interaction(context, armature_obj)
             root_name = get_active_bone_name(context, armature_obj)
             report = simplify_bone_chain(
                 armature_obj,
@@ -1076,9 +1173,16 @@ class KKVRC_OT_simplify_selected_bone_chain(bpy.types.Operator):
                 do_apply,
             )
         except Exception as ex:
+            restore_error = restore_armature_interaction(context, armature_obj, interaction_state) if armature_obj else None
+            if restore_error:
+                print(f"Could not restore Armature interaction mode: {restore_error}")
             self.report({"ERROR"}, str(ex))
             common.set_status(context, f"Bone simplify failed: {ex}")
             return {"CANCELLED"}
+
+        restore_error = restore_armature_interaction(context, armature_obj, interaction_state, (report.get("root"),))
+        if restore_error:
+            self.report({"WARNING"}, f"Operation succeeded, but mode restore failed: {restore_error}")
 
         title = "Simplify Physical Bone Chain Applied" if do_apply else "Simplify Physical Bone Chain Preview"
         print_bone_report(
@@ -1110,8 +1214,11 @@ class KKVRC_OT_merge_selected_parallel_bone_chains(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.kkvrc_cloth_tools
         do_apply = self.action == "APPLY"
+        armature_obj = None
+        interaction_state = None
         try:
             armature_obj = get_active_armature(context)
+            interaction_state = capture_armature_interaction(context, armature_obj)
             selected_names = get_selected_bone_names(context, armature_obj)
             active_name = get_active_bone_name(context, armature_obj)
             report = merge_parallel_bone_chains(
@@ -1124,9 +1231,16 @@ class KKVRC_OT_merge_selected_parallel_bone_chains(bpy.types.Operator):
                 do_apply,
             )
         except Exception as ex:
+            restore_error = restore_armature_interaction(context, armature_obj, interaction_state) if armature_obj else None
+            if restore_error:
+                print(f"Could not restore Armature interaction mode: {restore_error}")
             self.report({"ERROR"}, str(ex))
             common.set_status(context, f"Parallel chain merge failed: {ex}")
             return {"CANCELLED"}
+
+        restore_error = restore_armature_interaction(context, armature_obj, interaction_state, (report.get("root"),))
+        if restore_error:
+            self.report({"WARNING"}, f"Operation succeeded, but mode restore failed: {restore_error}")
 
         title = "Parallel Bone Chain Merge Applied" if do_apply else "Parallel Bone Chain Merge Preview"
         print_bone_report(
@@ -1158,8 +1272,11 @@ class KKVRC_OT_cleanup_hair_tip_placeholders(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.kkvrc_cloth_tools
         do_apply = self.action == "APPLY"
+        armature_obj = None
+        interaction_state = None
         try:
             armature_obj = get_active_armature(context)
+            interaction_state = capture_armature_interaction(context, armature_obj)
             patterns = parse_patterns(props.cleanup_hair_tip_patterns)
             report = cleanup_hair_tip_placeholders(
                 armature_obj,
@@ -1169,9 +1286,16 @@ class KKVRC_OT_cleanup_hair_tip_placeholders(bpy.types.Operator):
                 do_apply,
             )
         except Exception as ex:
+            restore_error = restore_armature_interaction(context, armature_obj, interaction_state) if armature_obj else None
+            if restore_error:
+                print(f"Could not restore Armature interaction mode: {restore_error}")
             self.report({"ERROR"}, str(ex))
             common.set_status(context, f"Hair tip cleanup failed: {ex}")
             return {"CANCELLED"}
+
+        restore_error = restore_armature_interaction(context, armature_obj, interaction_state)
+        if restore_error:
+            self.report({"WARNING"}, f"Operation succeeded, but mode restore failed: {restore_error}")
 
         title = "Hair Tip Placeholder Cleanup Applied" if do_apply else "Hair Tip Placeholder Cleanup Preview"
         print_bone_report(
