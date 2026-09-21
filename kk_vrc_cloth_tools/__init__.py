@@ -3,7 +3,7 @@
 
 bl_info = {
     "name": "KK/VRC Cloth Tools",
-    "author": "Tom Xu + Codex",
+    "author": "tomTomIEE + Codex",
     "version": (0, 2, 24),
     "blender": (4, 3, 0),
     "location": "View3D > Sidebar > KK/VRC Tools / model preprocess / mannual edit",
