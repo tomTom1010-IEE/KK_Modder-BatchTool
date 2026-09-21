@@ -89,6 +89,33 @@ The current interface is panel-driven: JSON is optional. Routine parameters are 
 | [VRC profile](VRC_WEIGHT_SCHEMA_CN.md) / [MMD profile](MMD_WEIGHT_SCHEMA_CN.md) | Maintained source-rig semantics |
 | [MMD preprocessing](MMD_PREPROCESS_CN.md) | Reviewed T-pose preparation and optimizer-entry limitations |
 
+## Agent skills
+
+The [`skills/`](skills/) directory contains the reusable agent workflows developed alongside this project. Each folder includes its `SKILL.md` and any supporting references or scripts. These are agent instructions, separate from the Blender add-on; copying them does not install Blender, an MCP connection, or Unity dependencies. The instructions are currently written in Chinese; the overview and installation instructions below are in English.
+
+| Skill | Purpose |
+|---|---|
+| [blender-transfer-garments](skills/blender-transfer-garments/SKILL.md) | Shared scene inspection, backups, coordinate handling, preservation of garment design and normals, and mesh validation; includes the read-only midline diagnostic script |
+| [blender-fit-close-garments](skills/blender-fit-close-garments/SKILL.md) | Fit close garments while preserving thickness, designed details, and relationships between dependent pieces; optional edge refinement when requested |
+| [blender-fit-loose-garments](skills/blender-fit-loose-garments/SKILL.md) | Preserve authored looseness and layering while fitting garments and grafting clothing bone chains |
+| [blender-transfer-dynamic-weights](skills/blender-transfer-dynamic-weights/SKILL.md) | Review body-following patterns, invoke the plugin's six-category transfer, preserve dynamics and selected fingers, and perform macro/terminal refinement |
+| [unity-package-kk-accessories](skills/unity-package-kk-accessories/SKILL.md) | Prepare fitted accessories for the existing KK Unity project pipeline, including pivots, hierarchy, materials, physics components, prefabs, and accessory tables |
+
+### Install and use
+
+For Codex, copy the individual skill folders from this repository's `skills/` into `$CODEX_HOME/skills`, or `~/.codex/skills` when `CODEX_HOME` is unset. Keep the entire folder, including `references/` and `scripts/`; do not copy only `SKILL.md`. Compare or back up an existing same-named skill before replacing it. The two fitting skills rely on the shared `blender-transfer-garments` skill, so install them together. Start a new agent session after installation so the skill catalog can be refreshed.
+
+Invoke a skill by name, for example:
+
+```text
+Use $blender-transfer-dynamic-weights to inspect this garment's original
+body/dynamic weight patterns and prepare a six-category transfer plan.
+```
+
+Provide the actual source garment, fitted target, body, project paths, and intended scope. Blender workflows require a working Blender code-execution connection and, for weight processing, the installed add-on and relevant solver dependencies. The Unity skill assumes an existing KK project with its Editor Bridge, shaders, and runtime components; those dependencies are not bundled here. Do not apply its project-specific conventions to an unrelated Unity project.
+
+The packaged skills retain their tested workflow guidance, including some historical API examples. Before executing an example, inspect the installed plugin version and function signatures. Unknown weight patterns still require Agent/manual analysis rather than automatic approval. Repository updates do not automatically update locally installed skills, and these workflows do not guarantee collision-free animation or replace user review.
+
 ## Scope and attribution
 
 Original and fitted garment meshes must retain vertex correspondence; source and target bodies need not share topology. Existing skeletons and bone transforms are used, not learned. Automatic suggestions do not establish bone semantics, and passing discrete poses is not a guarantee against all collisions. The later MMD skirt-outfit case uses a frozen fitted-mesh source reference and is documented in the [performance showcase](docs/performance-showcase.md).
