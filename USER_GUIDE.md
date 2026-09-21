@@ -24,16 +24,23 @@ The declared minimum is Blender 4.3. Local case studies used Blender 5.2; not ev
 
 MMD preparation uses a separate **model preprocess** tab.
 
-### External Python for garment optimization
+### Solver environment: automatic detection and one-click setup
 
-Six-category initialization and shoe processing do not require external OSQP. **Garment macro and terminal optimization** require an external Python interpreter with NumPy, SciPy, and OSQP. From the repository root:
+Garment main and terminal optimization require external NumPy, SciPy, and OSQP.
+Starting with **0.2.26**, solver setup is centralized in the **config → Solver Environment** sidebar panel:
 
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-optimizer.txt
-```
+1. The plugin checks existing environments automatically. **Detect automatically** repeats the check without downloading or installing anything.
+2. If no working environment is available, click **Install isolated environment**. This downloads the setup tool and solver packages from PyPI, and obtains Python 3.12 through uv if a suitable interpreter is missing. Internet access is required; administrator access is not.
+3. Wait for **Solver environment ready**. Installation runs in the background with progress, cancellation, and an installation log. A real numerical solve is checked before the new environment becomes active.
 
-Expand **Runtime and Configuration Files** at the bottom of the garment panel. Point **External Python** to this environment's interpreter and click **Check Solver Dependencies**. The beginner panel also has **Python and Dependency Settings**. Leave **Dependency Directory (Optional)** empty when packages are already installed in that environment; it is intended for separately installed dependencies. Blender preprocessing and shoe processing do not require this external environment.
+The managed environment is stored outside the add-on and survives plugin updates:
+Windows `%LOCALAPPDATA%/KKModderBatchTool/solver`, macOS `~/Library/Application Support/KKModderBatchTool/solver`, or Linux `$XDG_DATA_HOME/KKModderBatchTool/solver` (default `~/.local/share`). Existing system and Blender Python installations are not modified. A failed or canceled replacement leaves the previous active environment intact; incomplete installation directories are not activated.
+
+**Configure Python manually** keeps the existing interpreter/dependency-path workflow available. Dependencies may still be installed with `python -m pip install -r requirements-optimizer.txt`. Manual mode overrides automatic selection. Environments are detected in this order: validated managed environment, configured interpreter, then system Python candidates. No automatic download happens during detection.
+
+Automatic installation has been tested on Windows x64, including the missing-Python path. macOS and Linux download selection is implemented but not yet end-to-end tested. Network failures can be diagnosed with **Open installation log**; retry after resolving connectivity. The installer uses [uv-managed Python environments](https://docs.astral.sh/uv/guides/install-python/).
+
+Six-category initialization, preprocessing, manual tools, and shoes do not require this external environment. The installer is included in release ZIPs; Python and solver binaries are downloaded only when the user starts installation.
 
 ## 2. Prepare three inputs
 

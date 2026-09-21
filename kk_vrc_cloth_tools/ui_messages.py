@@ -731,3 +731,36 @@ def format_message(template, **values):
     return pgettext_iface(template).format(**values)
 
 TEMPLATES.update({})
+
+ZH_TO_EN.update({
+ '求解环境':'Solver Environment',
+ '自动检测':'Detect automatically',
+ '安装独立环境':'Install isolated environment',
+ '手动配置 Python':'Configure Python manually',
+ '安装会按需下载 Python 和求解库，需要网络。':'Installation downloads Python if needed and solver packages; internet required.',
+ '取消安装':'Cancel installation',
+ '打开安装日志':'Open installation log',
+ '求解环境尚未检查。':'Solver environment has not been checked.',
+ '求解环境已就绪。':'Solver environment ready.',
+ '正在检查求解环境…':'Checking solver environments...',
+ '正在准备安装求解环境…':'Preparing solver environment installation...',
+ '正在下载环境安装器…':'Downloading the environment installer...',
+ '正在创建独立 Python 环境…':'Creating an isolated Python environment...',
+ '正在安装 NumPy、SciPy 和 OSQP…':'Installing NumPy, SciPy, and OSQP...',
+ '正在运行数值求解测试…':'Validating the solver with a numerical smoke test...',
+ '未找到可用求解环境，请安装独立环境或手动配置 Python。':'No working solver environment found. Click Install solver environment, or configure Python manually.',
+ '另一个 Blender 实例正在安装求解环境。':'Another Blender instance is installing the solver environment.',
+ '此平台暂不支持自动安装，请手动配置外部 Python。':'Automatic installation is unavailable on this platform; configure an external Python manually.',
+ '已取消求解环境安装。':'Solver environment installation canceled.',
+ '安装器下载超过大小限制。':'Installer download exceeded its size limit.',
+ '没有适用此平台的环境安装器。':'No compatible environment installer is available.',
+ '安装器下载地址异常。':'Unexpected installer download host.',
+ '环境安装器校验失败。':'Environment installer checksum mismatch.',
+ '安装器压缩包结构异常。':'Unexpected installer archive layout.',
+ '安装超时，请查看安装日志。':'Environment setup timed out; see the installation log.',
+ '安装失败，请打开安装日志查看详情。':'Environment setup failed. Open the installation log for details.',
+ '尚无安装日志。':'No installation log yet.',
+ '请等待正在运行的求解任务结束后再切换环境。':'Wait for the current solver task to finish before changing environments.',
+})
+
+ZH_TO_EN.update({'已请求取消，正在等待当前操作停止。':'Cancellation requested; waiting for the current operation to stop.', '已启用手动 Python 配置，请在下方验证。':'Manual Python override is enabled; validate it below.'})

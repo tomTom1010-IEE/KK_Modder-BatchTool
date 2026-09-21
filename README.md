@@ -78,7 +78,7 @@ The shoe case passed four held-out poses without detected in-scope body intersec
 3. Supply the original weighted item, its already-fitted counterpart, and the target body. Scan and review bone roles and dynamic-root regions.
 4. Generate a new result copy and inspect the validation report. Save the `.blend` explicitly.
 
-The current interface is panel-driven: JSON is optional. Routine parameters are folded into advanced controls; unresolved semantic regions still require review. Garment optimization uses an external Python environment with [NumPy, SciPy, and OSQP](requirements-optimizer.txt); the shoe workflow uses Blender's bundled NumPy. See the [installation and guided workflows](USER_GUIDE.md).
+The current interface is panel-driven: JSON is optional. Routine parameters are folded into advanced controls; unresolved semantic regions still require review. Garment optimization uses an external Python environment with [NumPy, SciPy, and OSQP](requirements-optimizer.txt), with automatic detection and one-click isolated installation; the shoe workflow uses Blender's bundled NumPy. See the [installation and guided workflows](USER_GUIDE.md).
 
 ## Documentation
 

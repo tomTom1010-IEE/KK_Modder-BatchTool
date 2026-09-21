@@ -4,9 +4,9 @@
 bl_info = {
     "name": "KK/VRC Cloth Tools",
     "author": "tomTomIEE + Codex",
-    "version": (0, 2, 24),
+    "version": (0, 2, 26),
     "blender": (4, 3, 0),
-    "location": "View3D > Sidebar > KK/VRC Tools / model preprocess / mannual edit",
+    "location": "View3D > Sidebar > KK/VRC Tools / model preprocess / mannual edit / config",
     "description": "Batch tools for grafting VRC clothing bones and remapping weights to Koikatsu armatures.",
     "category": "Rigging",
 }
@@ -32,11 +32,15 @@ if "bpy" in locals():
     from . import glove_align
     from . import bone_cleanup
     from . import topology_export
+    from . import solver_environment, solver_setup
     from . import ui_messages, translations
     from . import ui, export_cleanup
     from . import mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui
     from . import accessory_rules, accessory_preprocess, accessory_ui
 
+    solver_setup.shutdown()
+    importlib.reload(solver_environment)
+    importlib.reload(solver_setup)
     importlib.reload(ui_messages)
     importlib.reload(mmd_weight_profiles)
 
@@ -63,6 +67,7 @@ else:
     from . import glove_align
     from . import bone_cleanup
     from . import topology_export
+    from . import solver_environment, solver_setup
     from . import ui_messages, translations
     from . import ui, export_cleanup
     from . import mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui
@@ -72,6 +77,7 @@ import bpy
 
 
 CLASSES = (
+    *solver_setup.CLASSES,
     *accessory_ui.CLASSES,
     *mmd_preprocess_ui.CLASSES,
     *shoe_workflow.CLASSES,
@@ -116,8 +122,10 @@ def register():
     bpy.types.Scene.kkvrc_weight_workflow = bpy.props.PointerProperty(type=workflow.KKVRC_WorkflowProperties)
     bpy.types.Scene.kkvrc_shoes = bpy.props.PointerProperty(type=shoe_ui.KKVRC_ShoeSettings)
 
+    bpy.app.timers.register(solver_setup.automatic_check, first_interval=1.0)
 
 def unregister():
+    solver_setup.shutdown()
     workflow.stop_jobs()
     if hasattr(bpy.types.Scene,'kkvrc_accessory'):
         del bpy.types.Scene.kkvrc_accessory

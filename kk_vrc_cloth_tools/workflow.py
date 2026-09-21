@@ -117,6 +117,7 @@ class KKVRC_WorkflowProperties(bpy.types.PropertyGroup):
     confidence:bpy.props.FloatProperty(name='Body sampling confidence',default=1,min=0,max=1)
     initial_mode:bpy.props.EnumProperty(name='Initialization source',items=[('NATIVE','Blender nearest face interpolated','Use native POLYINTERP_NEAREST only'),('EXISTING','Existing target distribution','Read reviewed target body weights using corresponding vertices'),('MAP','Semantic mapping only','No spatial transfer')],default='NATIVE')
     output:bpy.props.StringProperty(name='Run output directory',subtype='DIR_PATH')
+    manual_python:bpy.props.BoolProperty(name='Configure Python manually',default=False)
     python:bpy.props.StringProperty(name='External Python',subtype='FILE_PATH',default='python')
     dependencies:bpy.props.StringProperty(name='Dependencies directory (optional)',subtype='DIR_PATH')
     preset:bpy.props.StringProperty(name='Configuration file',subtype='FILE_PATH')
@@ -674,11 +675,8 @@ def review_result(p, rollback=False):
     obj.hide_set(False);obj.select_set(True);bpy.context.view_layer.objects.active=obj
 
 def python_command(p):
-    value=bpy.path.abspath(p.python) if ('/' in p.python or '\\' in p.python) else shutil.which(p.python)
-    if not value or not Path(value).is_file():raise ValueError('External Python not found; configure it in runtime settings')
-    env=os.environ.copy()
-    if p.dependencies:env['PYTHONPATH']=bpy.path.abspath(p.dependencies)+os.pathsep+env.get('PYTHONPATH','')
-    return value,env
+    from .solver_setup import resolve
+    return resolve(p)
 
 class KKVRC_OT_workflow(bpy.types.Operator):
     bl_idname='kkvrc.weight_workflow'
@@ -953,7 +951,6 @@ def draw(layout,context):
         if getattr(p,key):box.prop(p,key)
     box=layout.box();box.prop(p,'advanced')
     if p.advanced:
-        box.prop(p,'python');box.prop(p,'dependencies');button(box,'Check solver dependencies','DEPENDENCIES')
         box.prop(p,'preset');row=box.row(align=True);button(row,'Import configuration','IMPORT_PRESET');button(row,'Export configuration','EXPORT_PRESET')
         button(box,'Clear configuration (keep results)','CLEAR')
     layout.label(text=p.status[:110])

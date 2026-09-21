@@ -153,9 +153,6 @@ class KKVRC_PT_beginner_weights(bpy.types.Panel):
         layout.label(text='Press Esc to cancel; results are saved as a separate blend file')
         row=layout.row(align=True);w.button(row,'Select collision vertices','REVIEW_CONTACTS');w.button(row,'Revert to previous version','ROLLBACK_RESULT')
         if p.beginner_terminal:layout.label(text='Terminal refinement uses only the specified local selection and candidates')
-        layout.prop(p,'advanced',text='Python and dependency settings')
-        if p.advanced:
-            layout.prop(p,'python');layout.prop(p,'dependencies');w.button(layout,'Check dependencies','DEPENDENCIES')
         layout.label(text=p.status[:110])
 
 
