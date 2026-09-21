@@ -149,7 +149,18 @@ E_B(P)=\sum_{p,i}\alpha_pc_i'
 +\mu_B\|LP\|_F^2,
 $$
 
-where $D^TD=\operatorname{diag}(0.03,0.03,1)$ in the current implementation. Normal separation dominates; weak tangential terms discourage sliding. Remote vertices receive lower reference confidence. Dynamic weights and body budgets stay fixed. A projected-gradient solver with a conservative Hessian/graph bound handles the simplex and candidate constraints using NumPy. Convergence is an operational iterate-change criterion, not a reported global optimality certificate.
+where the current implementation uses
+
+$$
+D^T D =
+\begin{bmatrix}
+0.03 & 0 & 0 \\
+0 & 0.03 & 0 \\
+0 & 0 & 1
+\end{bmatrix}.
+$$
+
+Normal separation dominates; weak tangential terms discourage sliding. Remote vertices receive lower reference confidence. Dynamic weights and body budgets stay fixed. A projected-gradient solver with a conservative Hessian/graph bound handles the simplex and candidate constraints using NumPy. Convergence is an operational iterate-change criterion, not a reported global optimality certificate.
 
 This fixed-reference quadratic is **not** exact minimization of nearest-surface distance. Independent validation re-queries actual posed body surfaces. Shoe collisions currently act as acceptance gates, not active collision-repair constraints. A pre-existing collision can remain even when B does not worsen A.
 
