@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch
+from draw_architecture import draw_architecture
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT.parent / 'data'
@@ -23,24 +23,7 @@ cases = json.loads((DATA/'three-stage-comparison.json').read_text())['cases']
 stages = ['native','native_body_dynamic_budget','six_category','final']
 names = ['Native','Native + B/D','SBCST init.','SBCST final']
 
-fig, ax = plt.subplots(figsize=(7.1,1.65))
-ax.set(xlim=(-.15,10.15),ylim=(-.05,2)); ax.axis('off')
-boxes = [(0,1.2,1.8,'Paired rest meshes\nWeights and roles'),
-    (2.2,1.2,1.8,'Semantic budgets\nFixed attachments'),
-    (4.4,1.2,1.8,'Native samples\nReviewed mapping'),
-    (6.6,1.2,1.6,'Constrained\nresponse fit'),
-    (8.6,1.2,1.4,'Independent\nvalidation'),
-    (4.4,.05,1.8,'Extended shoe field\nGraph repair'),
-    (6.6,.05,1.6,'Optional\nseparation fit')]
-for i,(x,y,w,label) in enumerate(boxes):
-    ax.add_patch(FancyBboxPatch((x,y),w,.65,boxstyle='round,pad=0.03',lw=.8,
-        edgecolor=colors[2] if i>0 else '#506070',facecolor='#eef6f5' if i>0 else '#f2f4f6'))
-    ax.text(x+w/2,y+.325,label,ha='center',va='center',fontsize=6.9)
-def arrow(x,y,xx,yy): ax.annotate('',xy=(xx,yy),xytext=(x,y),arrowprops={'arrowstyle':'->','color':'#455565','lw':.8})
-for x,xx in [(1.8,2.2),(4,4.4),(6.2,6.6),(8.2,8.6)]:arrow(x,1.525,xx,1.525)
-arrow(4,1.4,4.4,.4);arrow(6.2,.375,6.6,.375);arrow(8.2,.4,8.6,1.3)
-ax.text(.05,.45,'Conserve allocation. Adapt the distribution.\nKeep skeletons and fitted geometry fixed.',fontsize=7)
-fig.savefig(OUT/'pipeline.pdf');plt.close(fig)
+draw_architecture()
 
 fig, axs = plt.subplots(1,2,figsize=(7.1,2.25),gridspec_kw={'wspace':.32})
 for ax,case,label in zip(axs,cases,['Jacket','Skirt outfit']):

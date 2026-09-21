@@ -14,7 +14,7 @@ Blender add-on **0.2.24** · Blender **4.3+ declared minimum** · Local case stu
 
 ![Preserve semantic influence budgets, choose garment response or shoe spatial fitting, and independently validate the result.](docs/assets/workflow.svg)
 
-*Method overview, not a rendered before/after result.*
+*SBCST architecture: paired geometry, conserved influence budgets, task-specific fitting, and independent validation. Meshes and fields are schematic.* [Editable SVG](docs/assets/workflow.svg) · [High-resolution PNG](docs/assets/workflow.png)
 
 **SBCST paper:** *Semantic Budget-Constrained Skinning Transfer for Garment Retargeting*, a 10-page technical manuscript presenting the general formulation, constrained optimization, scoped contact review, and quantitative case studies. [Read the PDF](docs/paper/SBCST.pdf) · [LaTeX source and build instructions](docs/paper/README.md). The paper is an independent technical manuscript, not a peer-reviewed publication.
 

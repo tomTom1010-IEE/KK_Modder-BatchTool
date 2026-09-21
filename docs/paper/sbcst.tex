@@ -55,7 +55,7 @@ Our contributions are (1) a practical decomposition of garment transfer into con
 
 \begin{figure*}[t]
 \centering\includegraphics[width=\textwidth]{figures/pipeline.pdf}
-\caption{SBCST separates invariant influence allocation from task-dependent fitting. The upper branch preserves authored response under new body proportions. The lower branch addresses footwear whose fitted extent makes target-body spatial association a more useful objective. Both branches retain clothing dynamics and use independent validation before writeback.}
+\caption{SBCST architecture. (A) Paired garment geometry and reviewed rig inputs. (B) Per-vertex semantic budgets preserve allocation while allowing redistribution among target bones. (C1) Garment-response fitting transports source motion; (C2) footwear fitting preserves target-body spatial association. (D) Independent validation checks invariants, held-out response, and explicitly reviewed contact scopes. Dashed stages are optional; meshes, weights, and feature curves are schematic.}
 \label{fig:pipeline}
 \end{figure*}
 
