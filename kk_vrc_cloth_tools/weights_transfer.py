@@ -227,9 +227,15 @@ def transfer_source_body_weights_to_target(source_body, target, body_group_names
     previous_mode = previous_active.mode if previous_active is not None else "OBJECT"
 
     temp_mesh = target.data.copy()
-    temp_obj = bpy.data.objects.new(f"{target.name}_kkvrc_transfer_sample", temp_mesh)
+    temp_obj = target.copy()
+    temp_obj.data = temp_mesh
+    temp_obj.name = f"{target.name}_kkvrc_transfer_sample"
+    temp_obj.modifiers.clear()
+    temp_obj.vertex_groups.clear()
     temp_obj.matrix_world = target.matrix_world.copy()
     context.collection.objects.link(temp_obj)
+    temp_obj.hide_viewport = False
+    temp_obj.hide_set(False)
 
     try:
         for group_name in body_group_names:
@@ -254,6 +260,11 @@ def transfer_source_body_weights_to_target(source_body, target, body_group_names
         try_set_modifier_property(modifier, "mix_mode", "REPLACE")
         try_set_modifier_property(modifier, "mix_factor", 1.0)
         try_set_modifier_property(modifier, "use_create", True)
+
+        if (modifier.vert_mapping != 'POLYINTERP_NEAREST' or
+                modifier.data_types_verts != {'VGROUP_WEIGHTS'} or
+                modifier.mix_mode != 'REPLACE'):
+            raise RuntimeError('Native nearest-face weight transfer configuration failed')
 
         bpy.ops.object.modifier_apply(modifier=modifier.name)
         return read_vertex_weights(temp_obj, body_group_names)

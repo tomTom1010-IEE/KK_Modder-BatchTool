@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="410" viewBox="0 0 1120 410" role="img" aria-labelledby="title desc">
+<title id="title">Garment weight transfer with conserved influence budgets</title>
+<desc id="desc">Original weights and fitted geometry establish semantic budgets. Garments fit transported motion; flat shoes fit a spatial field and optional separation. Both paths produce independently checked copies.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="#74869e"/></marker></defs>
+<rect width="1120" height="410" rx="18" fill="#101b2c"/>
+<g font-family="Segoe UI,Arial,sans-serif">
+<text x="32" y="43" fill="#f2f6ff" font-size="23" font-weight="700">Preserve the allocation. Adapt the distribution.</text>
+<text x="32" y="70" fill="#aabbcf" font-size="14">Two task-specific objectives, shared per-vertex influence constraints</text>
+<rect x="30" y="105" width="260" height="257" rx="12" fill="#1c2c42" stroke="#41556f"/>
+<text x="50" y="138" fill="#f2f6ff" font-size="18" font-weight="600">Reviewed inputs</text>
+<text x="50" y="170" fill="#c5d3e5" font-size="15">Original skinning weights</text>
+<text x="50" y="195" fill="#c5d3e5" font-size="15">Paired fitted garment mesh</text>
+<text x="50" y="220" fill="#c5d3e5" font-size="15">Target body and bone roles</text>
+<line x1="50" y1="238" x2="270" y2="238" stroke="#41556f"/>
+<text x="50" y="268" fill="#80dec6" font-size="16" font-weight="600">Conserved budgets</text>
+<text x="50" y="295" fill="#c5d3e5" font-size="14">Torso · arms · legs · dynamics</text>
+<text x="50" y="320" fill="#c5d3e5" font-size="14">Fixed retained dynamic weights</text>
+<text x="50" y="343" fill="#c5d3e5" font-size="14">Optional source finger reservation</text>
+<path d="M290 200H320V169H345M320 200V297H345" fill="none" stroke="#74869e" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="345" y="105" width="410" height="122" rx="12" fill="#193942" stroke="#367c80"/>
+<text x="365" y="136" fill="#80dec6" font-size="18" font-weight="600">Dynamic garments</text>
+<text x="365" y="165" fill="#e2f3f3" font-size="15">Native samples / semantic mapping</text>
+<text x="365" y="188" fill="#e2f3f3" font-size="15">Transported motion → constrained weight fitting</text>
+<text x="365" y="211" fill="#b5d6d8" font-size="13">Optional selected-region terminal refinement</text>
+<rect x="345" y="244" width="410" height="118" rx="12" fill="#2c2e4d" stroke="#6d6ca8"/>
+<text x="365" y="275" fill="#c5bfff" font-size="18" font-weight="600">Complex flat shoes</text>
+<text x="365" y="303" fill="#e8e5fb" font-size="15">Native field → toe extension → graph repair</text>
+<text x="365" y="328" fill="#e8e5fb" font-size="15">A: spatial field · B: optional gap refinement</text>
+<text x="365" y="349" fill="#c2bddc" font-size="13">Local candidates; bounded low-weight pose sampling</text>
+<path d="M755 168H782V230H810M755 303H782V230" fill="none" stroke="#74869e" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="810" y="105" width="280" height="257" rx="12" fill="#1c2c42" stroke="#41556f"/>
+<text x="830" y="138" fill="#f2f6ff" font-size="18" font-weight="600">Independent validation</text>
+<text x="830" y="172" fill="#c5d3e5" font-size="15">Held-out pose response</text>
+<text x="830" y="199" fill="#c5d3e5" font-size="15">Budgets and admitted bones</text>
+<text x="830" y="226" fill="#c5d3e5" font-size="15">Body intersection diagnostics</text>
+<text x="830" y="253" fill="#c5d3e5" font-size="15">Blender evaluation consistency</text>
+<line x1="830" y1="273" x2="1070" y2="273" stroke="#41556f"/>
+<text x="830" y="305" fill="#80dec6" font-size="17" font-weight="600">Result copies + reports</text>
+<text x="830" y="333" fill="#c5d3e5" font-size="14">Review in the target application</text>
+<text x="32" y="390" fill="#aabbcf" font-size="13">Scope: skinning-weight transfer. Static fitting and runtime secondary-motion simulation are separate.</text>
+</g></svg>

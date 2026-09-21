@@ -1,0 +1,153 @@
+{
+  "generated_on": "2026-09-21",
+  "scope": "Historical local case studies; not cross-method or runtime benchmarks. Each baseline is normalized independently to 100.",
+  "rows": [
+    {
+      "case": "closed_jacket",
+      "stage": "stage1",
+      "metric": "holdout_body_response_rms",
+      "scope_vertices": 8885,
+      "before": 0.0021501803241536256,
+      "after": 0.002094106301130421,
+      "accepted": true,
+      "max_region_error": 3.9871886681197566e-08,
+      "source_lbs_max_error": 3.9494989403630273e-07,
+      "archive_record": "close-no-bnip/stage1/validation.json",
+      "reduction_percent": 2.60787536716377,
+      "source_family": "VRC"
+    },
+    {
+      "case": "closed_jacket",
+      "stage": "stage2",
+      "metric": "holdout_body_response_rms",
+      "scope_vertices": 1514,
+      "before": 0.004615955041438413,
+      "after": 0.002435535459204122,
+      "accepted": true,
+      "max_region_error": 4.5693013817071915e-08,
+      "source_lbs_max_error": 2.8718932440279016e-07,
+      "archive_record": "close-no-bnip/stage2/validation.json",
+      "reduction_percent": 47.23658620285941,
+      "source_family": "VRC"
+    },
+    {
+      "case": "flat_shoes",
+      "stage": "A_to_B",
+      "metric": "heldout_separation_rms",
+      "before": 0.0006319863574574123,
+      "after": 0.0006004512402269417,
+      "accepted": true,
+      "vertex_count": 24082,
+      "standard_training_poses": 7,
+      "random_training_poses": 0,
+      "validation_poses": [
+        {
+          "pose": "rest_check",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        },
+        {
+          "pose": "heldout_up",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        },
+        {
+          "pose": "heldout_down",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        },
+        {
+          "pose": "heldout_tilt",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        }
+      ],
+      "actual_writeback": {
+        "actual_dynamic_error": 2.978166657729986e-08,
+        "actual_body_budget_error": 4.470348358154297e-08,
+        "pure_dynamic_polluted_vertices": 0,
+        "geometry_max_change": 0.0,
+        "unsupported_bones": [],
+        "unobserved_knee_bones": [],
+        "positive_body_groups": [
+          "cf_j_foot_L",
+          "cf_j_foot_R",
+          "cf_j_toes_L",
+          "cf_j_toes_R",
+          "cf_s_leg01_L",
+          "cf_s_leg01_R",
+          "cf_s_leg02_L",
+          "cf_s_leg02_R",
+          "cf_s_leg03_L",
+          "cf_s_leg03_R"
+        ]
+      },
+      "archive_record": "shoe-transfer/flat-round-02/report.json + actual-writeback-audit.json",
+      "reduction_percent": 4.989841451220823,
+      "source_family": "VRC"
+    },
+    {
+      "case": "liv_skirt",
+      "source_family": "MMD",
+      "stage": "macro",
+      "metric": "holdout_body_response_rms",
+      "scope_vertices": 4009,
+      "before": 0.0033508894959416533,
+      "after": 0.003341211936048506,
+      "accepted": false,
+      "non_contact_checks_pass": true,
+      "total_evaluated_poses": 18,
+      "heldout_poses": 4,
+      "max_region_error": 4.440892098500626e-16,
+      "source_lbs_max_error": 4.5076922506866536e-07,
+      "archive_record": "weight-transfer/20260921-liv-skirt/validation.json",
+      "sha256": "15c27d7ed235a9ccf6c7e5a31897b92c3a2fa28149bb1a37a3b56f74be377c5c",
+      "reference": "Current fitted mesh with complete original MMD weights, frozen before transfer.",
+      "collision_status": "Strict collision validation failed; result applied after user review of cap intersections.",
+      "reduction_percent": 0.28880570084057755
+    },
+    {
+      "case": "liv_skirt",
+      "source_family": "MMD",
+      "stage": "terminal",
+      "metric": "holdout_body_response_rms",
+      "scope_vertices": 986,
+      "before": 0.007373326899753853,
+      "after": 0.0073724341748134135,
+      "accepted": false,
+      "non_contact_checks_pass": true,
+      "total_evaluated_poses": 29,
+      "heldout_poses": 8,
+      "max_region_error": 4.284083843231201e-08,
+      "source_lbs_max_error": 4.3862855314899166e-07,
+      "archive_record": "weight-transfer/20260921-liv-skirt/wrist-terminal/validation.json",
+      "sha256": "c0b90702ad8da857474e0414239d721c670b144957bb34433eaf3771e1601fe4",
+      "reference": "Current fitted mesh with complete original MMD weights, frozen before transfer.",
+      "collision_status": "Strict collision validation failed; result applied after user review of cap intersections.",
+      "reduction_percent": 0.012107491673396531
+    }
+  ],
+  "mmd_writeback": {
+    "macro_budget_max_error": 4.284083843231201e-08,
+    "macro_fixed_max_error": 0.0,
+    "bnip_weight": 0,
+    "geometry_uv_material_normals_unchanged": true,
+    "terminal_dynamic_max_error": 0,
+    "terminal_geometry_max_error": 0.0,
+    "terminal_exterior_weights_exact": true,
+    "new_contact_vertices_outside_cap": 0,
+    "existing_nonexempt_vertices": 6,
+    "records": [
+      "weight-transfer/20260921-liv-skirt/optimized-write-report.json",
+      "weight-transfer/20260921-liv-skirt/wrist-terminal/final-audit.json"
+    ]
+  }
+}

@@ -4,6 +4,7 @@ from collections import deque
 import bpy
 
 from . import common
+from .vrc_bone_rules import TAG_VRC_SHINANO_SUPPORT, TAG_VRC_BREAST_CHAIN, VRC_SPECIAL_GROUPS
 
 
 PRIORITY_1_NAME_OVERRIDES = {
@@ -129,10 +130,6 @@ VRC_HUMANOID_BONES = {
     "LowerArm.L",
     "Lower_arm.R",
     "LowerArm.R",
-    "Upper_arm_support.L",
-    "Upper_arm_support.R",
-    "Lower_arm_support.L",
-    "Lower_arm_support.R",
     "Hand.L",
     "Hand.R",
     "Upper_leg.L",
@@ -178,6 +175,12 @@ VRC_HUMANOID_BONES = {
     "Little Intermediate.R",
     "Little Distal.R",
 }
+
+# This legacy exclusion set also contains avatar-specific body helpers.
+# Use the Shinano library rather than mistaking non-Humanoid helpers for cloth.
+VRC_HUMANOID_BONES.update(VRC_SPECIAL_GROUPS[TAG_VRC_SHINANO_SUPPORT])
+# Shinano body deformation chains are graft exclusions, not Unity Humanoid slots.
+VRC_HUMANOID_BONES.update(VRC_SPECIAL_GROUPS[TAG_VRC_BREAST_CHAIN])
 
 GRAFTABLE_SOURCE_PARENTS = set(PARENT_ATTACHMENT_MAPS["WAIST"]) | set(VRC_TO_KK_LIMB_PARENT_MAP)
 

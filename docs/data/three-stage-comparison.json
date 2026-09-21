@@ -1,0 +1,189 @@
+{
+  "measured_on": "2026-09-21",
+  "method": "Three fixed weight sets evaluated against identical frozen references within each suite; final is macro plus terminal. No retraining.",
+  "cases": [
+    {
+      "family": "VRC",
+      "vertices": 8885,
+      "metrics": {
+        "macro": {
+          "heldout_rms": {
+            "native": 0.002216911648832221,
+            "native_body_dynamic_budget": 0.0022169116488753686,
+            "six_category": 0.0021501803241536256,
+            "final": 0.002094106283433579
+          },
+          "scope_vertices": 8885,
+          "heldout_poses": [
+            "holdout_0",
+            "holdout_1",
+            "holdout_2"
+          ]
+        },
+        "terminal": {
+          "heldout_rms": {
+            "native": 0.004943749086248477,
+            "native_body_dynamic_budget": 0.004943749086253237,
+            "six_category": 0.004615955088808321,
+            "final": 0.0024355354592041217
+          },
+          "scope_vertices": 1514,
+          "heldout_poses": [
+            "holdout_L_-17",
+            "holdout_L_17",
+            "holdout_R_-17",
+            "holdout_R_17"
+          ]
+        }
+      },
+      "semantic_metrics": {
+        "native": {
+          "max_category_share_error": 0.9678756018840386,
+          "mean_vertex_l1_share_error": 0.25770745905354425,
+          "forbidden_body_category_vertices": 28,
+          "max_dynamic_weight_error": 0.9380324482917786,
+          "pure_dynamic_vertices_polluted": 0
+        },
+        "native_body_dynamic_budget": {
+          "max_category_share_error": 0.9586543729486066,
+          "mean_vertex_l1_share_error": 0.10169262069971756,
+          "forbidden_body_category_vertices": 28,
+          "max_dynamic_weight_error": 0.0,
+          "pure_dynamic_vertices_polluted": 0
+        },
+        "six_category": {
+          "max_category_share_error": 5.029141902923584e-08,
+          "mean_vertex_l1_share_error": 1.6591444978714607e-08,
+          "forbidden_body_category_vertices": 0,
+          "max_dynamic_weight_error": 0.0,
+          "pure_dynamic_vertices_polluted": 0
+        },
+        "final": {
+          "max_category_share_error": 4.5693013817071915e-08,
+          "mean_vertex_l1_share_error": 1.1865875591714747e-08,
+          "forbidden_body_category_vertices": 0,
+          "max_dynamic_weight_error": 0.0,
+          "pure_dynamic_vertices_polluted": 0
+        }
+      },
+      "replay_checks": {
+        "macro": {
+          "max_shared_matrix_error": 0.0,
+          "max_body_replay_error": 5.846119996988364e-07,
+          "max_native_blender_lbs_error": 3.5634281814189706e-07,
+          "context_id": "78c078ac136e1ff89da5538d4fe926ea1d98172c9a5a65bc2b55416da03cf4b4"
+        },
+        "terminal": {
+          "max_shared_matrix_error": 0.0,
+          "max_body_replay_error": 5.911058009733239e-07,
+          "max_native_blender_lbs_error": 3.695302846495885e-07,
+          "context_id": "47f9b75898ec30b0df0eccd8ea14e2a81ac975d6d4efbad03381852da7021c69"
+        }
+      },
+      "source_archive": "close-no-bnip",
+      "blend": "flat-shoe-AB.blend",
+      "baseline": "Native Blender POLYINTERP_NEAREST, all supported body groups, normalized; no clothing dynamic weights.",
+      "auxiliary_baseline": "Native body proportions scaled to original total body share, original dynamics retained; no six-category constraint.",
+      "final": "Archived macro + terminal optimized weights, evaluated on both frozen suites.",
+      "measurement_sha256": "e59900e15c0f3fab283b70aa767828ad705021f921ac9ff58c77c5116cfaa767",
+      "native_to_final_reduction_percent": {
+        "macro": 5.539479458431751,
+        "terminal": 50.735051138036056
+      }
+    },
+    {
+      "family": "MMD",
+      "vertices": 5864,
+      "metrics": {
+        "macro": {
+          "heldout_rms": {
+            "native": 0.003828860277329366,
+            "native_body_dynamic_budget": 0.0034557665599408037,
+            "six_category": 0.0033508894959416533,
+            "final": 0.0033412120092778793
+          },
+          "scope_vertices": 4009,
+          "heldout_poses": [
+            "combo_L",
+            "combo_R",
+            "torso_holdout",
+            "dynamic_holdout"
+          ]
+        },
+        "terminal": {
+          "heldout_rms": {
+            "native": 0.0073733081774691196,
+            "native_body_dynamic_budget": 0.0073733081774691196,
+            "six_category": 0.007373308485703455,
+            "final": 0.007372434174813413
+          },
+          "scope_vertices": 986,
+          "heldout_poses": [
+            "holdout_roll_L_-37",
+            "holdout_roll_L_37",
+            "holdout_bend_L",
+            "holdout_side_L",
+            "holdout_roll_R_-37",
+            "holdout_roll_R_37",
+            "holdout_bend_R",
+            "holdout_side_R"
+          ]
+        }
+      },
+      "semantic_metrics": {
+        "native": {
+          "max_category_share_error": 1.0000000000000002,
+          "mean_vertex_l1_share_error": 0.6939651429323113,
+          "forbidden_body_category_vertices": 2175,
+          "max_dynamic_weight_error": 1.0,
+          "pure_dynamic_vertices_polluted": 1855
+        },
+        "native_body_dynamic_budget": {
+          "max_category_share_error": 0.4703098319586313,
+          "mean_vertex_l1_share_error": 0.020043072548707585,
+          "forbidden_body_category_vertices": 320,
+          "max_dynamic_weight_error": 0.0,
+          "pure_dynamic_vertices_polluted": 0
+        },
+        "six_category": {
+          "max_category_share_error": 4.470348358154297e-08,
+          "mean_vertex_l1_share_error": 1.1483250961308693e-08,
+          "forbidden_body_category_vertices": 0,
+          "max_dynamic_weight_error": 0.0,
+          "pure_dynamic_vertices_polluted": 0
+        },
+        "final": {
+          "max_category_share_error": 4.284083843231201e-08,
+          "mean_vertex_l1_share_error": 6.453960056596864e-09,
+          "forbidden_body_category_vertices": 0,
+          "max_dynamic_weight_error": 0.0,
+          "pure_dynamic_vertices_polluted": 0
+        }
+      },
+      "replay_checks": {
+        "macro": {
+          "max_shared_matrix_error": 0.0,
+          "max_body_replay_error": 5.331986980827708e-07,
+          "max_native_blender_lbs_error": 2.999231916156475e-07,
+          "context_id": "0adb32a5bcdfd862ec24284b80958d460087c518b3154be06c2dc3a0b318c239"
+        },
+        "terminal": {
+          "max_shared_matrix_error": 0.0,
+          "max_body_replay_error": 5.240998770528194e-07,
+          "max_native_blender_lbs_error": 2.947102832884241e-07,
+          "context_id": "f543fcd5034554940decb506dff929936436925a9b113d3abbc41edf5e7f1d8e"
+        }
+      },
+      "source_archive": "20260921-liv-skirt",
+      "blend": "liv_skirt_optimized.blend",
+      "baseline": "Native Blender POLYINTERP_NEAREST, all supported body groups, normalized; no clothing dynamic weights.",
+      "auxiliary_baseline": "Native body proportions scaled to original total body share, original dynamics retained; no six-category constraint.",
+      "final": "Archived macro + terminal optimized weights, evaluated on both frozen suites.",
+      "measurement_sha256": "31041745deed165228f704f7804224e5a4b800f08f96001f962e2962fc586557",
+      "native_to_final_reduction_percent": {
+        "macro": 12.736120744307279,
+        "terminal": 0.011853602679701147
+      }
+    }
+  ]
+}

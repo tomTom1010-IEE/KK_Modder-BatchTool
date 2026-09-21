@@ -1,7 +1,7 @@
 import bpy
 from bpy.app.translations import pgettext_iface as iface_
 
-from . import common
+from . import common, workflow
 
 
 SHOW_BODY_WEIGHT_MAPPING_UI = False
@@ -16,7 +16,7 @@ class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
         default=False,
         description="Only copy clothing bone chains weighted by selected meshes; useful for gloves/socks cleanup",
     )
-    graft_delete_vrc_armature: bpy.props.BoolProperty(name="Delete VRC source Armature after graft", default=True)
+    graft_delete_vrc_armature: bpy.props.BoolProperty(name="Delete VRC source Armature after graft", default=False)
     graft_attachment_mode: bpy.props.EnumProperty(
         name="Parent-derived attach mode",
         items=(
@@ -319,6 +319,12 @@ class KKVRC_ClothToolsProperties(bpy.types.PropertyGroup):
         description="If enabled, weighted hair tip placeholders are merged to parent before deletion",
     )
 
+    cleanup_remove_tip_vertex_groups: bpy.props.BoolProperty(
+        name='Also remove weights and vertex groups for deleted tip bones',
+        default=False,
+        description='Only remove groups for tips actually deleted; weighted tips require merging to parent first. Skipped bones are unaffected',
+    )
+
     glove_align_side: bpy.props.EnumProperty(
         name="Side",
         items=(
@@ -381,12 +387,13 @@ def draw_section_title(layout, title):
     layout.label(text=title)
 
 
-class KKVRC_PT_cloth_tools(bpy.types.Panel):
-    bl_label = "KK/VRC Cloth Tools"
-    bl_idname = "KKVRC_PT_cloth_tools"
+class KKVRC_PT_manual_tools(bpy.types.Panel):
+    bl_label = 'Manual Editing'
+    bl_order = 0
+    bl_idname = "KKVRC_PT_manual_tools"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "KK/VRC Tools"
+    bl_category = "mannual edit"
 
     def draw(self, context):
         layout = self.layout
@@ -399,9 +406,9 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
             box.label(text=f"{iface_('VRC source')}: {vrc_name}", translate=False)
             box.label(text=f"{iface_('Selected meshes')}: {mesh_count}", translate=False)
 
-        box = draw_foldout_section(layout, props, "ui_show_bone_tools", "Bone Setup", "Step 1")
+        box = draw_foldout_section(layout, props, "ui_show_bone_tools", "Bone Setup")
         if box:
-            box.label(text="Step 1 - Graft Clothes Physical Bones To KK")
+            box.label(text="Graft Clothes Physical Bones To KK")
             box.prop(props, "graft_include_priority_1")
             box.prop(props, "graft_include_priority_2")
             box.prop(props, "graft_selected_meshes_only")
@@ -453,100 +460,16 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
             draw_section_title(box, "Clean VRC Hair Tip Placeholders")
             box.prop(props, "cleanup_hair_tip_patterns")
             box.prop(props, "cleanup_merge_weighted_hair_tips")
+            box.prop(props, "cleanup_remove_tip_vertex_groups")
             row = box.row(align=True)
             op = row.operator("kkvrc.cleanup_hair_tip_placeholders", text="Preview")
             op.action = "PREVIEW"
             op = row.operator("kkvrc.cleanup_hair_tip_placeholders", text="Apply")
             op.action = "APPLY"
 
-        if SHOW_BODY_WEIGHT_MAPPING_UI:
-            box = draw_foldout_section(layout, props, "ui_show_body_weights", "Body Weight Mapping", "Step 2 / 3 / 5")
-        else:
-            box = None
+        box = draw_foldout_section(layout, props, "ui_show_glove_tools", "Glove / Pose Tools")
         if box:
-            box.label(text="Step 2 - Remap Low-Risk Body Groups")
-            box.prop(props, "body_normalize_after_apply")
-            box.prop(props, "body_limit_total")
-            action_buttons(box, "kkvrc.remap_body_weights", "PREVIEW", "APPLY", "REPORT", "Report Orphans")
-
-            draw_section_title(box, "Step 3 - Mix Torso / Hip / Butt Weights")
-            box.prop(props, "torso_mode")
-            box.prop(props, "torso_remove_source_groups")
-            box.prop(props, "torso_normalize_affected_only")
-            box.prop(props, "torso_smooth_after_apply")
-            if props.torso_smooth_after_apply:
-                row = box.row(align=True)
-                row.prop(props, "torso_smooth_iterations")
-                row.prop(props, "torso_smooth_strength")
-                box.prop(props, "torso_smooth_expand_rings")
-            action_buttons(box, "kkvrc.mix_torso_hip_weights")
-
-            draw_section_title(box, "Step 5 - Transfer KK Body Weights To Fitted Clothes")
-            box.prop(props, "transfer_source_body_mesh")
-            box.prop(props, "transfer_physical_threshold")
-            box.prop(props, "transfer_replace_body_weights")
-            box.prop(props, "transfer_treat_vrc_humanoid_as_body")
-            box.prop(props, "transfer_remove_replaced_non_kk_groups")
-            box.prop(props, "transfer_normalize_affected_only")
-            box.prop(props, "transfer_max_distance")
-            action_buttons(box, "kkvrc.transfer_body_weights_to_fitted_clothes")
-
-        if SHOW_BREAST_WEIGHT_TOOLS_UI:
-            box = draw_foldout_section(layout, props, "ui_show_breast_weights", "Breast Weight Tools", "Step 4A / 4B")
-        else:
-            box = None
-        if box:
-            box.label(text="Step 4A - Breast Simple Remap")
-            box.prop(props, "breast_simple_mode")
-            box.prop(props, "breast_simple_remove_source_groups")
-            box.prop(props, "breast_simple_normalize_affected_only")
-            box.prop(props, "breast_simple_smooth_after_apply")
-            if props.breast_simple_smooth_after_apply:
-                row = box.row(align=True)
-                row.prop(props, "breast_simple_smooth_iterations")
-                row.prop(props, "breast_simple_smooth_strength")
-                box.prop(props, "breast_simple_smooth_expand_rings")
-            action_buttons(box, "kkvrc.remap_breast_simple")
-
-            draw_section_title(box, "Step 4B - Breast Local Mix")
-            box.prop(props, "breast_local_mode")
-            box.prop(props, "breast_local_include_root_group")
-            box.prop(props, "breast_local_breast_factor")
-            box.prop(props, "breast_local_body_factor")
-            box.prop(props, "breast_local_remove_source_groups")
-            box.prop(props, "breast_local_normalize_affected_only")
-            box.prop(props, "breast_local_smooth_after_apply")
-            if props.breast_local_smooth_after_apply:
-                row = box.row(align=True)
-                row.prop(props, "breast_local_smooth_iterations")
-                row.prop(props, "breast_local_smooth_strength")
-                box.prop(props, "breast_local_smooth_expand_rings")
-            action_buttons(box, "kkvrc.mix_breast_local")
-
-        box = draw_foldout_section(layout, props, "ui_show_transfer_postprocess", "Manual Transfer Postprocess", "Step 5B")
-        if box:
-            box.label(text="Step 5B - Postprocess Manual Weight Transfer")
-            box.label(text="Run Blender Data Transfer first, then use these cleanup tools.")
-            box.separator()
-            box.label(text="Region-Based Dynamic Bone Protection")
-            box.label(text="After manual Data Transfer, keep useful fitted body weights and remove unrelated region weights.")
-            box.prop(props, "transfer_source_body_mesh")
-            box.prop(props, "manual_transfer_region")
-            box.prop(props, "manual_transfer_overlap_mode")
-            box.prop(props, "manual_skirt_dynamic_threshold")
-            box.prop(props, "manual_skirt_normalize_affected_only")
-            box.prop(props, "manual_skirt_smooth_iterations")
-            action_buttons(box, "kkvrc.postprocess_manual_skirt_weights", "PREVIEW", "APPLY", "REPORT", "Report Postprocess")
-            box.separator()
-            box.label(text="Upper-Clothes Nipple Detail Cleanup")
-            box.label(text="Remove cf_*_bnip weights that can create chest bumps after transfer.")
-            box.prop(props, "cleanup_bnip_merge_to_bust")
-            box.prop(props, "cleanup_bnip_normalize_affected")
-            action_buttons(box, "kkvrc.remove_bnip_weights", "PREVIEW", "APPLY", "REPORT", "Report Nipple")
-
-        box = draw_foldout_section(layout, props, "ui_show_glove_tools", "Glove / Pose Tools", "Step 6")
-        if box:
-            box.label(text="Step 6 - Align VRC Glove Hand Pose To KK")
+            box.label(text="Align VRC Glove Hand Pose To KK")
             box.prop(props, "glove_align_side")
             box.prop(props, "glove_align_transform_mode")
             box.prop(props, "glove_align_influence")
@@ -562,13 +485,20 @@ class KKVRC_PT_cloth_tools(bpy.types.Panel):
             box.prop(props, "cleanup_empty_group_threshold")
             action_buttons(box, "kkvrc.remove_empty_vertex_groups", "PREVIEW", "APPLY", "REPORT", "Report Empty")
             box.separator()
-            box.label(text="Clean Body Weights From Dynamic Areas")
-            box.prop(props, "transfer_dynamic_cleanup_threshold")
-            box.prop(props, "transfer_dynamic_cleanup_normalize")
-            action_buttons(box, "kkvrc.cleanup_dynamic_body_weights", "PREVIEW", "APPLY", "REPORT", "Report Cleanup")
-            box.separator()
             box.operator("kkvrc.export_armature_topology", text="Export Armature Topology JSON")
 
         box = layout.box()
         box.label(text="Last Status")
         box.label(text=props.last_status)
+
+
+class KKVRC_PT_cloth_tools(bpy.types.Panel):
+    bl_label = 'Dynamic Garment Weight Transfer'
+    bl_order = 0
+    bl_idname = "KKVRC_PT_cloth_tools"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "KK/VRC Tools"
+
+    def draw(self, context):
+        workflow.draw(self.layout, context)

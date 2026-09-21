@@ -1,220 +1,96 @@
-# KK/VRC Cloth Tools
+<div align="center">
 
-[简体中文](README_CN.md)
+# KK Modder BatchTool
 
-This toolset helps convert VRC clothing to a Koikatsu/KK armature workflow. It currently contains two parts:
+### Garment weight transfer with semantic budgets and pose-based refinement
 
-- Blender add-on: `kk_vrc_cloth_tools`, used for bone grafting, vertex group remapping, risky-area weight mixing, fitted-clothing weight transfer, and armature topology export.
-- Unity Editor script: `UnityBoneImplant.cs`, used after importing the FBX into Unity to automatically add `BoneImplantProcess` components, with optional `DynamicBone` setup.
+**Preserve authored body–dynamic influence. Adapt the body weights to a new character.**
 
-This guide assumes you downloaded these files from a GitHub Release:
+[Technical Report](docs/technical-report.md) · [User Guide](USER_GUIDE.md) · [Downloads](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases) · [License](LICENSE)
 
-- Blender add-on archive, for example `kk_vrc_cloth_tools.zip`
-- Unity script file `UnityBoneImplant.cs`
+Blender add-on **0.2.24** · Blender **4.3+ declared minimum** · Local case studies on **Blender 5.2** · MIT
 
-## Blender Add-On Installation
+</div>
 
-Requirements:
+![Preserve semantic influence budgets, choose garment response or shoe spatial fitting, and independently validate the result.](docs/assets/workflow.svg)
 
-- Blender 4.3 or newer
-- A prepared KK Armature and VRC/clothing Armature, or clothing meshes already bound to the target armature
+*Method overview, not a rendered before/after result.*
 
-Installation:
+## What it does
 
-1. Open Blender.
-2. Go to `Edit > Preferences > Add-ons`.
-3. Click the top-right menu or `Install from Disk...`.
-4. Select `kk_vrc_cloth_tools.zip` from the Release files.
-5. Enable the add-on `KK/VRC Cloth Tools`.
-6. In the 3D View, press `N` to open the sidebar, then open the `KK/VRC Tools` tab.
+Retargeting clothing is more than copying nearby body weights. A collar can accidentally inherit arm influence; a ribbon can lose its intended body following; a long shoe tip can inherit an unsuitable distribution. This toolset preserves the original per-vertex influence allocation while fitting the remaining body weights to a new rig.
 
-If Blender is using a Chinese UI language, the add-on will automatically display Chinese UI text.
+Two complementary workflows share the same principle:
 
-## Blender Workflow
+| Dynamic garments | Complex flat shoes |
+|---|---|
+| Preserve six semantic budgets and retained dynamic-bone weights. | Preserve left/right body budgets and each retained lace-bone weight. |
+| Initialize with Blender's native nearest-face interpolation or reviewed semantic mapping. | Sample the target foot with native interpolation and extend the field into long toe boxes. |
+| Fit transported source motion with constrained optimization. | Repair spatial discontinuities, then optionally refine body–shoe separation over foot poses. |
+| Optionally refine a selected wrist/hand region in a second stage. | Compare field-only A with gap-refined B on independent poses. |
 
-Use the tools in the order shown in the panel. For every step, run `Preview` or `Scan Preview` first, check the Blender Console report, then run `Apply`.
+The add-on also includes bone grafting, a conservative beginner workflow, whole-chain export cleanup, MMD garment preprocessing, and a companion Unity component-setup tool. **Static garment modeling and runtime cloth/secondary-motion simulation remain separate tasks.**
 
-### Step 1 - Graft Clothes Physical Bones To KK
+## Recorded results
 
-Purpose: graft custom clothing physical bones into the KK Armature.
+### Six-category constraints: 100% fewer wrong-category vertices
 
-Basic usage:
+![Six-category initialization reduces wrong-category vertices by 100% in both measured cases: VRC 28 to zero and MMD 2,175 to zero.](docs/assets/six-category-showcase.svg)
 
-1. Select the KK Armature and the VRC/clothing Armature.
-2. Choose a graft parent mode. `Waist` is the recommended default.
-3. Click `Scan Preview` to inspect the bone roots that will be grafted.
-4. Click `Apply`.
+This improvement is already present **before response optimization**. Against a stronger native baseline that preserves total body/dynamic influence, violations still fall **28 → 0 for VRC** and **320 → 0 for MMD**. The 100% reduction refers to this defined semantic-violation metric in these two cases, not overall accuracy or collision freedom.
 
-Notes:
+[High-resolution PNG](docs/assets/six-category-showcase.png) · [Vector SVG](docs/assets/six-category-showcase.svg) · [Definitions and measurements](docs/three-stage-comparison.md#what-six-category-protection-contributes)
 
-- `Pelvis / Waist / High Waist` controls where unknown clothing roots attach to the KK body chain.
-- For skirts, waist accessories, and similar clothing parts, try `Waist` first.
-- Breast, torso, waist, and butt areas should not rely only on direct one-to-one body remapping. Use the later dedicated weight steps for those areas.
+### Native transfer → six categories → final optimization
 
-### Step 2 - Remap Low-Risk Body Groups
+![Same-input native, six-category, and final optimized weights for VRC and MMD.](docs/assets/three-stage-comparison.svg)
 
-Purpose: rename low-risk VRC humanoid vertex groups to KK body bone names.
+On identical held-out suites, final RMS is **50.735% lower for the VRC jacket terminal scope** and **12.736% lower for the MMD macro scope** than plain native transfer. Six-category initialization removes measured wrong-category influence: **28 → 0 VRC vertices** and **2,175 → 0 MMD vertices**. Even a native baseline that already preserves body/dynamic totals leaves **320** MMD vertices with wrong-category influence.
 
-This step handles areas such as neck, head, arms, legs, fingers, feet, and toes. It intentionally does not process:
+[Three-stage measurements, definitions, and stronger baseline](docs/three-stage-comparison.md) · [Full-size PNG](docs/assets/three-stage-comparison.png)
 
-- `Hips`
-- `Spine`
-- `Chest`
-- `Butt.L`
-- `Butt.R`
+### Optimization-only stage improvements
 
-Use Step 3 for those excluded areas.
+![VRC and MMD optimization results: source-specific error reductions and preserved influence budgets.](docs/assets/performance-showcase.svg)
 
-### Step 3 - Mix Torso / Hip / Butt Weights
+[Full-size PNG](docs/assets/performance-showcase.png) · [Measurements and MMD collision-review scope](docs/performance-showcase.md) · [Figure data](docs/data/performance-showcase.json)
 
-Purpose: distribute torso, waist, hip, and butt weights across the KK body chain to reduce clipping around the lower torso, waistline, and back hip area.
+These are local development case studies, not a benchmark against other methods. Values are RMS errors in scene coordinate units; each row compares its own baseline and result. The garment and shoe objectives differ.
 
-Modes:
+| Case and stage | Before | After | Reduction |
+|---|---:|---:|---:|
+| Closed jacket · macro response, 8,885 vertices | 0.00215018 | 0.00209411 | 2.61% |
+| Closed jacket · terminal response, 1,514 selected vertices | 0.00461596 | 0.00243554 | 47.24% |
+| Flat shoes · held-out separation RMS, A → B | 0.000631986 | 0.000600451 | 4.99% |
+| MMD skirt outfit · macro response, 4,009 vertices | 0.003350889 | 0.003341212 | 0.29% |
+| MMD skirt outfit · terminal response, 986 vertices | 0.007373327 | 0.007372434 | 0.012% |
 
-- `Balanced`: recommended default. Distributes weights across `hips / waist01 / waist02 / spine / siri` bones.
-- `Conservative`: uses fewer target bones. Try this if Balanced feels too soft or stretches too much.
+The MMD extension preserves authored dynamic influence with small incremental motion-error improvements. Strict collision validation did not pass: cap intersections were accepted through user review, and six existing non-exempt vertices remained flagged in the terminal audit. These are not collision-free MMD results.
 
-Options:
+The shoe case passed four held-out poses without detected in-scope body intersections; actual body-budget and dynamic-weight errors were below `5e-8`. This case used seven standard training poses. The subsequently added low-weight random preset is **not** part of those measurements. Asset files are not redistributed; [measurement provenance and limitations](docs/technical-report.md#6-local-case-studies) are documented in the report.
 
-- `Remove source groups after apply`: removes the original VRC source groups after applying. Recommended.
-- `Normalize affected vertices only`: normalizes only edited vertices. Recommended.
-- Smoothing options: smooth the newly mixed risky area into surrounding vertices for a softer transition.
+## Start here
 
-### Step 4A - Breast Simple Remap
+1. Install the Blender add-on folder/archive containing `kk_vrc_cloth_tools`, then enable **KK/VRC Cloth Tools**.
+2. Open **3D View → N → KK/VRC Tools**. Choose **Dynamic Garment Weight Transfer** for garments or **Complex Flat-Shoe Weight Transfer** for shoes.
+3. Supply the original weighted item, its already-fitted counterpart, and the target body. Scan and review bone roles and dynamic-root regions.
+4. Generate a new result copy and inspect the validation report. Save the `.blend` explicitly.
 
-Purpose: remap `Breast_root / Breast_1 / Breast_2` to the KK bust chain.
+The current interface is panel-driven: JSON is optional. Routine parameters are folded into advanced controls; unresolved semantic regions still require review. Garment optimization uses an external Python environment with [NumPy, SciPy, and OSQP](requirements-optimizer.txt); the shoe workflow uses Blender's bundled NumPy. See the [installation and guided workflows](USER_GUIDE.md).
 
-Modes:
+## Documentation
 
-- `Simple J Chain`: direct one-to-one mapping.
-- `Distributed J Chain`: distributes each VRC breast group into adjacent KK bust bones for a smoother transition.
+| Read | Purpose |
+|---|---|
+| [Technical report](docs/technical-report.md) | Formulation, constraints, objectives, and measured scope |
+| [User manual](USER_GUIDE.md) | Current panels, installation, review, execution, and troubleshooting |
+| [Flat-shoe implementation notes](FLAT_SHOE_WORKFLOW_CN.md) | Spatial-field details; the user manual is authoritative for current UI navigation |
+| [Weight core](WEIGHT_FEATURES_CN.md) / [Optimizer](WEIGHT_OPTIMIZER_CN.md) | Developer interfaces and invariants |
+| [VRC profile](VRC_WEIGHT_SCHEMA_CN.md) / [MMD profile](MMD_WEIGHT_SCHEMA_CN.md) | Maintained source-rig semantics |
+| [MMD preprocessing](MMD_PREPROCESS_CN.md) | Reviewed T-pose preparation and optimizer-entry limitations |
 
-Useful for fitted breast cloth, bras, and upper-body clothing that should follow the KK bust bones.
+## Scope and attribution
 
-### Step 4B - Breast Local Mix
+Original and fitted garment meshes must retain vertex correspondence; source and target bodies need not share topology. Existing skeletons and bone transforms are used, not learned. Automatic suggestions do not establish bone semantics, and passing discrete poses is not a guarantee against all collisions. The later MMD skirt-outfit case uses a frozen fitted-mesh source reference and is documented in the [performance showcase](docs/performance-showcase.md).
 
-Purpose: preserve some surrounding body influence while transferring breast physical weights into KK bust bones.
-
-Recommended default:
-
-- `Distributed J Chain`
-- `Breast influence = 0.70`
-- `Body influence = 0.30`
-
-If the breast edge has hard creases or harsh deformation, try 4B before using 4A.
-
-### Step 5 - Transfer KK Body Weights To Fitted Clothes
-
-Purpose: directly transfer weights from the KK body mesh to fitted clothing.
-
-Best for:
-
-- Underwear
-- Bodysuits
-- Socks
-- Gloves
-- Tight shirts or tights
-
-Not recommended for:
-
-- Skirts
-- Ribbons
-- Capes
-- Cloth strips
-- Areas mainly controlled by custom clothing physical bones
-
-Basic usage:
-
-1. Set `Source body mesh` to the KK body mesh.
-2. Select the clothing meshes that should receive body weights.
-3. Run `Preview` and check the affected vertex count.
-4. Run `Apply`.
-
-`Physical weight threshold` protects vertices controlled by physical clothing bones. Lower values are more conservative and are less likely to overwrite dynamic-bone areas.
-
-### Utilities - Export Armature Topology JSON
-
-Purpose: export the selected armature's bone topology to JSON. This is useful for checking hierarchy, maintaining the standard KK bone list, or debugging future scripts.
-
-## Unity Script Installation
-
-Requirements:
-
-- Your Unity project already includes the Koikatsu/KK modding tools you use.
-- The project can resolve the `BoneImplantProcess` type.
-- If you want automatic Dynamic Bone setup, the project must also contain `DynamicBone`.
-
-Installation:
-
-1. In your Unity project, create or locate the `Assets/Editor` folder.
-2. Put `UnityBoneImplant.cs` into `Assets/Editor`.
-3. Wait for Unity to compile.
-4. Open `Tools > KK Mods > Auto Bone Implant` from the Unity menu bar.
-
-## Unity Workflow
-
-1. Import the FBX exported from Blender.
-2. Drag the imported clothing prefab or the top-level scene object into `Root Object`.
-3. Click `Scan Preview`.
-4. Check the Preview list. It should show entries like:
-
-```text
-CustomClothBoneRoot -> KKParentBone
-```
-
-5. Click `Apply Preview`.
-
-The script adds `BoneImplantProcess` components to the `Root Object`, not to each bone object. Each component stores:
-
-- `trfSrc`: the custom clothing bone root
-- `trfDst`: the target KK standard parent bone
-
-## Unity Dynamic Bone Options
-
-To add Dynamic Bone components during the same pass, enable:
-
-```text
-Add/Update Dynamic Bone components after implant
-```
-
-Bind modes:
-
-- `ImplantRoots`: uses the implant root itself as the Dynamic Bone Root.
-- `FirstLevelChildren`: uses each immediate child of the implant root as a Dynamic Bone Root.
-
-Common choices:
-
-- Use `ImplantRoots` when the whole physical chain should move from the root.
-- Use `FirstLevelChildren` when the root is only an attachment point and the real swinging chain starts from the next bone.
-
-Keep `Skip existing Dynamic Bone roots` enabled to avoid duplicate Dynamic Bone components for the same root.
-
-## Export And Import Notes
-
-- Before exporting FBX from Blender, make sure the clothing mesh Armature modifier points to the final KK Armature.
-- Seeing the FBX root rotated 90 degrees on X in Unity is usually caused by Blender/Unity coordinate conversion. If the internal bones, mesh, and bindings behave correctly, it is usually harmless.
-- For fitted clothing, prefer Step 5 body weight transfer.
-- For skirts, ribbons, bows, capes, and other dynamic structures, preserve the custom physical bones and add `BoneImplantProcess` plus `DynamicBone` in Unity.
-- Before large weight changes, keep a backup Blender file so you can compare different modes.
-
-## Recommended Full Workflow
-
-1. Blender: import or prepare the KK model and VRC clothing.
-2. Blender Step 1: graft clothing physical bones.
-3. Blender Step 2: remap low-risk body weights.
-4. Blender Step 3: process torso, waist, hip, and butt weights.
-5. Blender Step 4A or 4B: process breast weights.
-6. Blender Step 5: transfer KK body weights for fitted clothing.
-7. Blender: export FBX.
-8. Unity: import FBX.
-9. Unity: use `Auto Bone Implant` to add `BoneImplantProcess`.
-10. Unity: add `DynamicBone` if needed.
-
-## Troubleshooting
-
-- Blender add-on is not visible: make sure it is enabled, then press `N` in the 3D View and open `KK/VRC Tools`.
-- `Preview` finds no objects: make sure you selected a mesh or armature, and that the mesh Armature modifier points to the correct armature.
-- Unity cannot find `BoneImplantProcess`: make sure KoikatsuModdingTools / ModBoneImplantor is imported.
-- Unity cannot find `DynamicBone`: disable automatic Dynamic Bone creation if your project does not include Dynamic Bone.
-- Preview finds too few bones: disable the prefix filter, or confirm the clothing physical bones are actually used by a SkinnedMeshRenderer.
-- Preview finds too many bones: enable the prefix filter, or check whether non-clothing objects are being detected as custom bones.
+The [technical report](docs/technical-report.md) discusses SSDR and bounded biharmonic weights as related work. This project is not an implementation of SSDR, and makes no claim of outperforming it. Code is released under the [MIT License](LICENSE); third-party models, Blender, Unity packages, and solver dependencies retain their respective licenses.

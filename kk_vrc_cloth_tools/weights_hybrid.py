@@ -6,14 +6,10 @@ from . import common
 from . import bone_rules
 from . import weights_body
 from . import weights_transfer
+from .vrc_bone_rules import VRC_SPECIAL_GROUPS, TAG_VRC_ARM_SUPPORT
 
 
-SUPPORT_GROUPS = {
-    "Upper_arm_support.L",
-    "Upper_arm_support.R",
-    "Lower_arm_support.L",
-    "Lower_arm_support.R",
-}
+SUPPORT_GROUPS = set(VRC_SPECIAL_GROUPS[TAG_VRC_ARM_SUPPORT])
 
 REPLACEABLE_VRC_GROUPS = set(weights_transfer.VRC_HUMANOID_GROUPS) | SUPPORT_GROUPS | {"Butt.L", "Butt.R"}
 

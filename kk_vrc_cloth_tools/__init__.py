@@ -1,9 +1,9 @@
 bl_info = {
     "name": "KK/VRC Cloth Tools",
     "author": "Tom Xu + Codex",
-    "version": (0, 1, 0),
+    "version": (0, 2, 24),
     "blender": (4, 3, 0),
-    "location": "View3D > Sidebar > KK/VRC Tools",
+    "location": "View3D > Sidebar > KK/VRC Tools / model preprocess / mannual edit",
     "description": "Batch tools for grafting VRC clothing bones and remapping weights to Koikatsu armatures.",
     "category": "Rigging",
 }
@@ -19,13 +19,27 @@ if "bpy" in locals():
     from . import weights_breast
     from . import weights_transfer
     from . import weights_hybrid
+    from . import weight_features
+    from . import weights_features
+    from . import weights_optimization
+    from . import mmd_weight_profiles
+    from . import optimizer_validation
+    from . import optimizer_scope, workflow_regions, workflow_presets, region_patterns, optimizer_profiles, workflow, workflow_beginner
+    from . import shoe_field, shoe_presets, shoe_workflow, shoe_ui
     from . import glove_align
     from . import bone_cleanup
     from . import topology_export
-    from . import translations
-    from . import ui
+    from . import ui_messages, translations
+    from . import ui, export_cleanup
+    from . import mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui
+    from . import accessory_rules, accessory_preprocess, accessory_ui
 
-    for _module in (common, bone_rules, vrc_bone_rules, graft, weights_body, weights_torso, weights_breast, weights_transfer, weights_hybrid, glove_align, bone_cleanup, topology_export, translations, ui):
+    importlib.reload(ui_messages)
+    importlib.reload(mmd_weight_profiles)
+
+    for _module in (common, bone_rules, vrc_bone_rules, graft, weights_body, weights_torso, weights_breast, weights_transfer, weights_hybrid, weight_features, weights_features, optimizer_scope, weights_optimization, optimizer_validation, workflow_regions, workflow_presets, region_patterns, optimizer_profiles, workflow, workflow_beginner, shoe_field, shoe_presets, shoe_workflow, shoe_ui, glove_align, bone_cleanup, topology_export, translations, ui, export_cleanup, mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui):
+        importlib.reload(_module)
+    for _module in (accessory_rules,accessory_preprocess,accessory_ui):
         importlib.reload(_module)
 else:
     from . import common
@@ -37,16 +51,30 @@ else:
     from . import weights_breast
     from . import weights_transfer
     from . import weights_hybrid
+    from . import weight_features
+    from . import weights_features
+    from . import weights_optimization
+    from . import optimizer_validation
+    from . import optimizer_scope, workflow_regions, workflow_presets, region_patterns, optimizer_profiles, workflow, workflow_beginner
+    from . import shoe_field, shoe_presets, shoe_workflow, shoe_ui
     from . import glove_align
     from . import bone_cleanup
     from . import topology_export
-    from . import translations
-    from . import ui
+    from . import ui_messages, translations
+    from . import ui, export_cleanup
+    from . import mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui
+    from . import accessory_rules, accessory_preprocess, accessory_ui
 
 import bpy
 
 
 CLASSES = (
+    *accessory_ui.CLASSES,
+    *mmd_preprocess_ui.CLASSES,
+    *shoe_workflow.CLASSES,
+    *shoe_ui.CLASSES,
+    *workflow.CLASSES,
+    *workflow_beginner.CLASSES,
     ui.KKVRC_ClothToolsProperties,
     graft.KKVRC_OT_graft_clothes_bones,
     weights_body.KKVRC_OT_remap_body_weights,
@@ -69,6 +97,8 @@ CLASSES = (
     bone_cleanup.KKVRC_OT_cleanup_hair_tip_placeholders,
     topology_export.KKVRC_OT_export_armature_topology,
     ui.KKVRC_PT_cloth_tools,
+    ui.KKVRC_PT_manual_tools,
+    *export_cleanup.CLASSES,
 )
 
 
@@ -76,10 +106,26 @@ def register():
     bpy.app.translations.register(__name__, translations.TRANSLATIONS)
     for cls in CLASSES:
         bpy.utils.register_class(cls)
+    bpy.types.Scene.kkvrc_mmd_preprocess = bpy.props.PointerProperty(type=mmd_preprocess_ui.KKVRC_MMDSettings)
+    bpy.types.Scene.kkvrc_accessory = bpy.props.PointerProperty(type=accessory_ui.KKVRC_AccessorySettings)
+    bpy.types.Scene.kkvrc_export_cleanup = bpy.props.PointerProperty(type=export_cleanup.KKVRC_ExportCleanup)
     bpy.types.Scene.kkvrc_cloth_tools = bpy.props.PointerProperty(type=ui.KKVRC_ClothToolsProperties)
+    bpy.types.Scene.kkvrc_weight_workflow = bpy.props.PointerProperty(type=workflow.KKVRC_WorkflowProperties)
+    bpy.types.Scene.kkvrc_shoes = bpy.props.PointerProperty(type=shoe_ui.KKVRC_ShoeSettings)
 
 
 def unregister():
+    workflow.stop_jobs()
+    if hasattr(bpy.types.Scene,'kkvrc_accessory'):
+        del bpy.types.Scene.kkvrc_accessory
+    if hasattr(bpy.types.Scene, 'kkvrc_mmd_preprocess'):
+        del bpy.types.Scene.kkvrc_mmd_preprocess
+    if hasattr(bpy.types.Scene, "kkvrc_export_cleanup"):
+        del bpy.types.Scene.kkvrc_export_cleanup
+    if hasattr(bpy.types.Scene, 'kkvrc_shoes'):
+        del bpy.types.Scene.kkvrc_shoes
+    if hasattr(bpy.types.Scene, 'kkvrc_weight_workflow'):
+        del bpy.types.Scene.kkvrc_weight_workflow
     if hasattr(bpy.types.Scene, "kkvrc_cloth_tools"):
         del bpy.types.Scene.kkvrc_cloth_tools
     for cls in reversed(CLASSES):

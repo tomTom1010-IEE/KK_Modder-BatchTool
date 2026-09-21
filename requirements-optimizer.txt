@@ -1,0 +1,4 @@
+# Optional offline worker dependencies; Blender itself only needs bundled numpy.
+numpy>=1.26,<3
+scipy>=1.11,<2
+osqp>=1.0,<2

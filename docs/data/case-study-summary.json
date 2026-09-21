@@ -1,0 +1,96 @@
+{
+  "description": "Extracted historical development metrics; not a public reproducible asset benchmark. Source meshes and full scene archives are not redistributed.",
+  "units": "scene coordinate units",
+  "documentation_snapshot": "0.2.17",
+  "cases": [
+    {
+      "case": "closed_jacket",
+      "stage": "stage1",
+      "metric": "holdout_body_response_rms",
+      "scope_vertices": 8885,
+      "before": 0.0021501803241536256,
+      "after": 0.002094106301130421,
+      "accepted": true,
+      "max_region_error": 3.9871886681197566e-08,
+      "source_lbs_max_error": 3.9494989403630273e-07,
+      "archive_record": "close-no-bnip/stage1/validation.json",
+      "reduction_percent": 2.60787536716377
+    },
+    {
+      "case": "closed_jacket",
+      "stage": "stage2",
+      "metric": "holdout_body_response_rms",
+      "scope_vertices": 1514,
+      "before": 0.004615955041438413,
+      "after": 0.002435535459204122,
+      "accepted": true,
+      "max_region_error": 4.5693013817071915e-08,
+      "source_lbs_max_error": 2.8718932440279016e-07,
+      "archive_record": "close-no-bnip/stage2/validation.json",
+      "reduction_percent": 47.23658620285941
+    },
+    {
+      "case": "flat_shoes",
+      "stage": "A_to_B",
+      "metric": "heldout_separation_rms",
+      "before": 0.0006319863574574123,
+      "after": 0.0006004512402269417,
+      "accepted": true,
+      "vertex_count": 24082,
+      "standard_training_poses": 7,
+      "random_training_poses": 0,
+      "validation_poses": [
+        {
+          "pose": "rest_check",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        },
+        {
+          "pose": "heldout_up",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        },
+        {
+          "pose": "heldout_down",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        },
+        {
+          "pose": "heldout_tilt",
+          "intersecting_triangle_pairs": 0,
+          "ambiguous_coplanar_pairs": 0,
+          "penetrating_samples": 0,
+          "max_oriented_depth": 0.0
+        }
+      ],
+      "actual_writeback": {
+        "actual_dynamic_error": 2.978166657729986e-08,
+        "actual_body_budget_error": 4.470348358154297e-08,
+        "pure_dynamic_polluted_vertices": 0,
+        "geometry_max_change": 0.0,
+        "unsupported_bones": [],
+        "unobserved_knee_bones": [],
+        "positive_body_groups": [
+          "cf_j_foot_L",
+          "cf_j_foot_R",
+          "cf_j_toes_L",
+          "cf_j_toes_R",
+          "cf_s_leg01_L",
+          "cf_s_leg01_R",
+          "cf_s_leg02_L",
+          "cf_s_leg02_R",
+          "cf_s_leg03_L",
+          "cf_s_leg03_R"
+        ]
+      },
+      "archive_record": "shoe-transfer/flat-round-02/report.json + actual-writeback-audit.json",
+      "reduction_percent": 4.989841451220823
+    }
+  ]
+}

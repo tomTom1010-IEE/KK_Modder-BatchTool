@@ -1,0 +1,860 @@
+{
+  "schema": "mmd_bone_conventions_v1",
+  "status": "RESEARCH_NOT_RUNTIME_CONFIG",
+  "sources": [
+    "https://nanoem.readthedocs.io/ja/latest/plugin.html",
+    "https://raw.githubusercontent.com/MMD-Blender/blender_mmd_tools/main/mmd_tools/core/pmx/__init__.py",
+    "https://creators.vrchat.com/avatars/rig-requirements/"
+  ],
+  "matching": "NFKC and Blender .L/.R aliases; retain original names; reject collisions",
+  "unknown_policy": "REVIEW; never assume non-whitelist means clothing physics",
+  "body_role_requires": "Verify hierarchy, geometry, actual weights and dependency graph on each asset",
+  "source_deformation": "Preserve all positively weighted effective deformers, including support bones",
+  "target_admission": "Only positively weighted body bones from the actual target body mesh",
+  "entries": {
+    "下半身": {
+      "name_j": "下半身",
+      "kind": "BODY",
+      "budget_region": "TORSO",
+      "reference_semantic": "HIPS",
+      "evidence": "common_convention"
+    },
+    "上半身": {
+      "name_j": "上半身",
+      "kind": "BODY",
+      "budget_region": "TORSO",
+      "reference_semantic": "SPINE",
+      "evidence": "common_convention"
+    },
+    "上半身2": {
+      "name_j": "上半身2",
+      "kind": "BODY",
+      "budget_region": "TORSO",
+      "reference_semantic": "CHEST",
+      "evidence": "semi_standard"
+    },
+    "首": {
+      "name_j": "首",
+      "kind": "BODY",
+      "budget_region": "TORSO",
+      "reference_semantic": "NECK",
+      "evidence": "common_convention"
+    },
+    "頭": {
+      "name_j": "頭",
+      "kind": "BODY",
+      "budget_region": "TORSO",
+      "reference_semantic": "HEAD",
+      "evidence": "common_convention"
+    },
+    "腰": {
+      "name_j": "腰",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "TORSO",
+      "reference_semantic": "HIPS",
+      "evidence": "semi_standard"
+    },
+    "上半身3": {
+      "name_j": "上半身3",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "TORSO",
+      "reference_semantic": null,
+      "evidence": "observed_r4_liv_extension"
+    },
+    "全ての親": {
+      "name_j": "全ての親",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "センター": {
+      "name_j": "センター",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "グルーブ": {
+      "name_j": "グルーブ",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "操作中心": {
+      "name_j": "操作中心",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "observed_r4_liv_extension"
+    },
+    "センター2": {
+      "name_j": "センター2",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "observed_r4_liv_extension"
+    },
+    "グルーブ2": {
+      "name_j": "グルーブ2",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "observed_r4_liv_extension"
+    },
+    "両目": {
+      "name_j": "両目",
+      "kind": "FACIAL_REVIEW",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "左目": {
+      "name_j": "左目",
+      "kind": "FACIAL_REVIEW",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "右目": {
+      "name_j": "右目",
+      "kind": "FACIAL_REVIEW",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "左肩": {
+      "name_j": "左肩",
+      "kind": "BODY",
+      "budget_region": "ARM_L",
+      "reference_semantic": "SHOULDER_L",
+      "evidence": "common_convention"
+    },
+    "左腕": {
+      "name_j": "左腕",
+      "kind": "BODY",
+      "budget_region": "ARM_L",
+      "reference_semantic": "UPPER_ARM_L",
+      "evidence": "common_convention"
+    },
+    "左ひじ": {
+      "name_j": "左ひじ",
+      "kind": "BODY",
+      "budget_region": "ARM_L",
+      "reference_semantic": "LOWER_ARM_L",
+      "evidence": "common_convention"
+    },
+    "左手首": {
+      "name_j": "左手首",
+      "kind": "BODY",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention"
+    },
+    "左足": {
+      "name_j": "左足",
+      "kind": "BODY",
+      "budget_region": "LEG_L",
+      "reference_semantic": "UPPER_LEG_L",
+      "evidence": "common_convention"
+    },
+    "左ひざ": {
+      "name_j": "左ひざ",
+      "kind": "BODY",
+      "budget_region": "LEG_L",
+      "reference_semantic": "LOWER_LEG_L",
+      "evidence": "common_convention"
+    },
+    "左足首": {
+      "name_j": "左足首",
+      "kind": "BODY",
+      "budget_region": "LEG_L",
+      "reference_semantic": "FOOT_L",
+      "evidence": "common_convention"
+    },
+    "左つま先": {
+      "name_j": "左つま先",
+      "kind": "BODY",
+      "budget_region": "LEG_L",
+      "reference_semantic": "TOES_L",
+      "evidence": "common_convention"
+    },
+    "左腕捩": {
+      "name_j": "左腕捩",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "UPPER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左腕捩1": {
+      "name_j": "左腕捩1",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "UPPER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左腕捩2": {
+      "name_j": "左腕捩2",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "UPPER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左腕捩3": {
+      "name_j": "左腕捩3",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "UPPER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左手捩": {
+      "name_j": "左手捩",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "LOWER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左手捩1": {
+      "name_j": "左手捩1",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "LOWER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左手捩2": {
+      "name_j": "左手捩2",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "LOWER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左手捩3": {
+      "name_j": "左手捩3",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_L",
+      "reference_semantic": "LOWER_ARM_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左足D": {
+      "name_j": "左足D",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_L",
+      "reference_semantic": "UPPER_LEG_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左ひざD": {
+      "name_j": "左ひざD",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_L",
+      "reference_semantic": "LOWER_LEG_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左足首D": {
+      "name_j": "左足首D",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_L",
+      "reference_semantic": "FOOT_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左足先EX": {
+      "name_j": "左足先EX",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_L",
+      "reference_semantic": "TOES_L",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "左肩P": {
+      "name_j": "左肩P",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "左肩C": {
+      "name_j": "左肩C",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "左足IK親": {
+      "name_j": "左足IK親",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "左足IK": {
+      "name_j": "左足IK",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "左つま先IK": {
+      "name_j": "左つま先IK",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "左ダミー": {
+      "name_j": "左ダミー",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "腰キャンセル左": {
+      "name_j": "腰キャンセル左",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "semi_standard"
+    },
+    "左親指0": {
+      "name_j": "左親指0",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "thumb",
+      "side": "L",
+      "source_segment": 0,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左親指1": {
+      "name_j": "左親指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "thumb",
+      "side": "L",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左親指2": {
+      "name_j": "左親指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "thumb",
+      "side": "L",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左人指1": {
+      "name_j": "左人指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "index",
+      "side": "L",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左人指2": {
+      "name_j": "左人指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "index",
+      "side": "L",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左人指3": {
+      "name_j": "左人指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "index",
+      "side": "L",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左中指1": {
+      "name_j": "左中指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "middle",
+      "side": "L",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左中指2": {
+      "name_j": "左中指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "middle",
+      "side": "L",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左中指3": {
+      "name_j": "左中指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "middle",
+      "side": "L",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左薬指1": {
+      "name_j": "左薬指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "ring",
+      "side": "L",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左薬指2": {
+      "name_j": "左薬指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "ring",
+      "side": "L",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左薬指3": {
+      "name_j": "左薬指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "ring",
+      "side": "L",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左小指1": {
+      "name_j": "左小指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "little",
+      "side": "L",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左小指2": {
+      "name_j": "左小指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "little",
+      "side": "L",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "左小指3": {
+      "name_j": "左小指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_L",
+      "reference_semantic": "HAND_L",
+      "evidence": "common_convention",
+      "finger": "little",
+      "side": "L",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右肩": {
+      "name_j": "右肩",
+      "kind": "BODY",
+      "budget_region": "ARM_R",
+      "reference_semantic": "SHOULDER_R",
+      "evidence": "common_convention"
+    },
+    "右腕": {
+      "name_j": "右腕",
+      "kind": "BODY",
+      "budget_region": "ARM_R",
+      "reference_semantic": "UPPER_ARM_R",
+      "evidence": "common_convention"
+    },
+    "右ひじ": {
+      "name_j": "右ひじ",
+      "kind": "BODY",
+      "budget_region": "ARM_R",
+      "reference_semantic": "LOWER_ARM_R",
+      "evidence": "common_convention"
+    },
+    "右手首": {
+      "name_j": "右手首",
+      "kind": "BODY",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention"
+    },
+    "右足": {
+      "name_j": "右足",
+      "kind": "BODY",
+      "budget_region": "LEG_R",
+      "reference_semantic": "UPPER_LEG_R",
+      "evidence": "common_convention"
+    },
+    "右ひざ": {
+      "name_j": "右ひざ",
+      "kind": "BODY",
+      "budget_region": "LEG_R",
+      "reference_semantic": "LOWER_LEG_R",
+      "evidence": "common_convention"
+    },
+    "右足首": {
+      "name_j": "右足首",
+      "kind": "BODY",
+      "budget_region": "LEG_R",
+      "reference_semantic": "FOOT_R",
+      "evidence": "common_convention"
+    },
+    "右つま先": {
+      "name_j": "右つま先",
+      "kind": "BODY",
+      "budget_region": "LEG_R",
+      "reference_semantic": "TOES_R",
+      "evidence": "common_convention"
+    },
+    "右腕捩": {
+      "name_j": "右腕捩",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "UPPER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右腕捩1": {
+      "name_j": "右腕捩1",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "UPPER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右腕捩2": {
+      "name_j": "右腕捩2",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "UPPER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右腕捩3": {
+      "name_j": "右腕捩3",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "UPPER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右手捩": {
+      "name_j": "右手捩",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "LOWER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右手捩1": {
+      "name_j": "右手捩1",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "LOWER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右手捩2": {
+      "name_j": "右手捩2",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "LOWER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右手捩3": {
+      "name_j": "右手捩3",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "ARM_R",
+      "reference_semantic": "LOWER_ARM_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右足D": {
+      "name_j": "右足D",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_R",
+      "reference_semantic": "UPPER_LEG_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右ひざD": {
+      "name_j": "右ひざD",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_R",
+      "reference_semantic": "LOWER_LEG_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右足首D": {
+      "name_j": "右足首D",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_R",
+      "reference_semantic": "FOOT_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右足先EX": {
+      "name_j": "右足先EX",
+      "kind": "BODY_SUPPORT",
+      "budget_region": "LEG_R",
+      "reference_semantic": "TOES_R",
+      "evidence": "semi_standard",
+      "sample_own_evaluated_matrix": true
+    },
+    "右肩P": {
+      "name_j": "右肩P",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "右肩C": {
+      "name_j": "右肩C",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "右足IK親": {
+      "name_j": "右足IK親",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "右足IK": {
+      "name_j": "右足IK",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "右つま先IK": {
+      "name_j": "右つま先IK",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "右ダミー": {
+      "name_j": "右ダミー",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "common_convention"
+    },
+    "腰キャンセル右": {
+      "name_j": "腰キャンセル右",
+      "kind": "CONTROL",
+      "budget_region": null,
+      "reference_semantic": null,
+      "evidence": "semi_standard"
+    },
+    "右親指0": {
+      "name_j": "右親指0",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "thumb",
+      "side": "R",
+      "source_segment": 0,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右親指1": {
+      "name_j": "右親指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "thumb",
+      "side": "R",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右親指2": {
+      "name_j": "右親指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "thumb",
+      "side": "R",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右人指1": {
+      "name_j": "右人指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "index",
+      "side": "R",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右人指2": {
+      "name_j": "右人指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "index",
+      "side": "R",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右人指3": {
+      "name_j": "右人指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "index",
+      "side": "R",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右中指1": {
+      "name_j": "右中指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "middle",
+      "side": "R",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右中指2": {
+      "name_j": "右中指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "middle",
+      "side": "R",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右中指3": {
+      "name_j": "右中指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "middle",
+      "side": "R",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右薬指1": {
+      "name_j": "右薬指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "ring",
+      "side": "R",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右薬指2": {
+      "name_j": "右薬指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "ring",
+      "side": "R",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右薬指3": {
+      "name_j": "右薬指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "ring",
+      "side": "R",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右小指1": {
+      "name_j": "右小指1",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "little",
+      "side": "R",
+      "source_segment": 1,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右小指2": {
+      "name_j": "右小指2",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "little",
+      "side": "R",
+      "source_segment": 2,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    },
+    "右小指3": {
+      "name_j": "右小指3",
+      "kind": "FINGER",
+      "budget_region": "ARM_R",
+      "reference_semantic": "HAND_R",
+      "evidence": "common_convention",
+      "finger": "little",
+      "side": "R",
+      "source_segment": 3,
+      "target_segment": "REQUIRES_ANATOMICAL_MAPPING"
+    }
+  }
+}

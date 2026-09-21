@@ -39,6 +39,9 @@ REGION_TAIL = "tail"
 
 TAG_VRC_HUMANOID = "vrc_humanoid"
 TAG_VRC_SHINANO_BODY = "vrc_shinano_body"
+# Shinano's Upper_arm_support.L/R and Lower_arm_support.L/R are body
+# deformation helpers, not clothing physics bones or Unity Humanoid slots.
+# Graft exclusion must include this group even when their mesh weights exist.
 TAG_VRC_SHINANO_SUPPORT = "vrc_shinano_support"
 TAG_VRC_AVATAR_APPENDAGE = "vrc_avatar_appendage"
 TAG_VRC_REPLACEABLE_BODY = "vrc_replaceable_body"
@@ -230,4 +233,72 @@ def vrc_bone_tags(name):
 def vrc_bone_avatars(name):
     rule = VRC_STANDARD_BODY_BONES.get(name)
     return rule.avatars if rule else frozenset()
+
+
+class VrcWeightPolicy(NamedTuple):
+    """Source evidence policy, independent of grafting and target admission.
+
+    These are avatar-profile hints, not universal VRChat bone-name requirements.
+    REVIEW needs an explicit decision using actual binding/runtime behaviour.
+    An anchor is an anatomical reference frame, never permission to delete or
+    merge the source bone's weight. Sample the source bone's own matrix.
+    """
+    source_role: str
+    budget_region: str | None
+    reference_anchor: str | None
+    preserve_source_deformation: bool
+    graft_source_bone: bool
+    target_admission: str
+
+
+def _weight_policy(rule):
+    body = bool({TAG_VRC_HUMANOID, TAG_VRC_ARM_SUPPORT, TAG_VRC_BREAST_CHAIN} & rule.tags)
+    if REGION_ARM in rule.regions or REGION_HAND in rule.regions:
+        region = 'ARM_' + rule.side if rule.side else None
+    elif REGION_LEG in rule.regions:
+        region = 'LEG_' + rule.side if rule.side else None
+    elif REGION_TORSO in rule.regions or TAG_VRC_BREAST_CHAIN in rule.tags:
+        region = 'TORSO'
+    else:
+        region = None
+    return VrcWeightPolicy(
+        'BODY' if body else 'REVIEW', region,
+        rule.parent if TAG_VRC_ARM_SUPPORT in rule.tags else rule.name,
+        True, False, 'actual_positive_target_body_weights')
+
+
+VRC_WEIGHT_POLICIES = {name: _weight_policy(rule) for name, rule in VRC_STANDARD_BODY_BONES.items()}
+
+# Semantic slots used by motion presets; aliases remain avatar-profile data.
+VRC_MOTION_SEMANTICS = {'Hips':'HIPS','Spine':'SPINE','Chest':'CHEST','Neck':'NECK','Head':'HEAD'}
+for _side in ('L','R'):
+    for _semantic,_aliases in {
+        'UPPER_ARM':('Upper_arm','UpperArm'),'LOWER_ARM':('Lower_arm','LowerArm'),
+        'HAND':('Hand',),'UPPER_LEG':('Upper_leg','UpperLeg'),
+        'LOWER_LEG':('Lower_leg','LowerLeg'),'FOOT':('Foot',),
+    }.items():
+        for _alias in _aliases:VRC_MOTION_SEMANTICS[f'{_alias}.{_side}']=f'{_semantic}_{_side}'
+
+
+def audit_vrc_weight_roles(rows, bones, roles):
+    """Pure-data audit. bones: name -> {parent, use_deform} from live rig.
+
+    Unknown cloth chains stay unclassified. Non-Humanoid does not imply
+    DYNAMIC. Profile hierarchy mismatches must be reviewed, not auto-corrected.
+    """
+    used = {name for row in rows for name, w in row.items() if w > 0}
+    conflicts = []; hierarchy = []; observed = {}
+    for name in sorted(used):
+        bone = bones.get(name)
+        policy = VRC_WEIGHT_POLICIES.get(name)
+        if policy is None or bone is None:
+            continue
+        observed[name] = policy._asdict()
+        if bone.get('parent') != VRC_STANDARD_BONE_PARENTS[name]:
+            hierarchy.append(name)
+        if bone.get('use_deform') and roles.get(name) in {'DROP', 'IGNORE'}:
+            conflicts.append(name)
+    return {'known_weighted_bones': observed, 'discarded_deform_bones': conflicts,
+            'profile_parent_mismatches': hierarchy,
+            'unknown_weighted_names': sorted(used - VRC_STANDARD_BODY_BONE_NAMES)}
 

@@ -227,6 +227,13 @@ ZH_HANS = {
 }
 
 
+from .ui_messages import ZH_TO_EN, TEMPLATES
+
+for _zh, _en in ZH_TO_EN.items():
+    ZH_HANS.setdefault(('*', _en), _zh)
+for _en, _zh in TEMPLATES.items():
+    ZH_HANS[('*', _en)] = _zh
+
 TRANSLATIONS = {
     "zh_HANS": ZH_HANS,
     "zh_CN": ZH_HANS,

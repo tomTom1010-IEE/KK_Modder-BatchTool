@@ -1,0 +1,445 @@
+{
+  "source": "Shoes",
+  "target": "Shoes.001",
+  "body": "o_body_a_0",
+  "prefix": "Shoes.FlatFinal",
+  "smoothing": 0.7,
+  "prior": 0.1,
+  "reviewed_dynamic_policy": {
+    "decision": "preserve_original_per_vertex_body_and_each_dynamic_share; target_spatial_body_field",
+    "B1": "Manual review: attachment falloff followed by zero body; automatic isotonic score 0.641 below 0.65. No uniform pedestal.",
+    "B4": "Manual review: main strand attachment falloff and disconnected 152-vertex tip; retain all tiny original body contributions, no threshold cleanup.",
+    "scope": "All explicit source-body groups and retained String chains; source topology verified. This shoe-specific policy is not automatic garment pattern approval."
+  },
+  "sides": [
+    {
+      "name": "L",
+      "source_body": [
+        "Lower_leg.L",
+        "Foot.L",
+        "Toe.L"
+      ],
+      "target_body": [
+        "cf_j_foot_L",
+        "cf_j_toes_L",
+        "cf_s_leg_L",
+        "cf_s_leg01_L",
+        "cf_s_leg02_L",
+        "cf_s_leg03_L",
+        "cf_s_kneeB_L",
+        "cf_d_kneeF_L"
+      ],
+      "dynamic": [
+        "String_B1_L",
+        "String_B1_L.001",
+        "String_B2_L",
+        "String_B2_L.001",
+        "String_B3_L",
+        "String_B3_L.001",
+        "String_B3_L.002",
+        "String_B4_L",
+        "String_B4_L.001",
+        "String_B4_L.002"
+      ],
+      "foot": "cf_j_foot_L",
+      "toes": "cf_j_toes_L",
+      "forward": [
+        0,
+        -1,
+        0
+      ],
+      "up": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "R",
+      "source_body": [
+        "Lower_leg.R",
+        "Foot.R",
+        "Toe.R"
+      ],
+      "target_body": [
+        "cf_j_foot_R",
+        "cf_j_toes_R",
+        "cf_s_leg_R",
+        "cf_s_leg01_R",
+        "cf_s_leg02_R",
+        "cf_s_leg03_R",
+        "cf_s_kneeB_R",
+        "cf_d_kneeF_R"
+      ],
+      "dynamic": [
+        "String_B1_R",
+        "String_B1_R.001",
+        "String_B2_R",
+        "String_B2_R.001",
+        "String_B3_R",
+        "String_B3_R.001",
+        "String_B3_R.002",
+        "String_B4_R",
+        "String_B4_R.001",
+        "String_B4_R.002"
+      ],
+      "foot": "cf_j_foot_R",
+      "toes": "cf_j_toes_R",
+      "forward": [
+        0,
+        -1,
+        0
+      ],
+      "up": [
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "poses": [
+    {
+      "name": "ankle_up",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 20
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 20
+        }
+      ],
+      "validation": false
+    },
+    {
+      "name": "ankle_down",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -20
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -20
+        }
+      ],
+      "validation": false
+    },
+    {
+      "name": "tilt_in",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            0,
+            -1,
+            0
+          ],
+          "degrees": 10
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            0,
+            -1,
+            0
+          ],
+          "degrees": -10
+        }
+      ],
+      "validation": false
+    },
+    {
+      "name": "tilt_out",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            0,
+            -1,
+            0
+          ],
+          "degrees": -10
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            0,
+            -1,
+            0
+          ],
+          "degrees": 10
+        }
+      ],
+      "validation": false
+    },
+    {
+      "name": "forefoot_up",
+      "controls": [
+        {
+          "bone": "cf_j_toes_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 18
+        },
+        {
+          "bone": "cf_j_toes_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 18
+        }
+      ],
+      "validation": false
+    },
+    {
+      "name": "forefoot_down",
+      "controls": [
+        {
+          "bone": "cf_j_toes_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -12
+        },
+        {
+          "bone": "cf_j_toes_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -12
+        }
+      ],
+      "validation": false
+    },
+    {
+      "name": "combined",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 12
+        },
+        {
+          "bone": "cf_j_toes_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 10
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 12
+        },
+        {
+          "bone": "cf_j_toes_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 10
+        }
+      ],
+      "validation": false
+    },
+    {
+      "name": "rest_check",
+      "controls": [],
+      "validation": true
+    },
+    {
+      "name": "heldout_up",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 13
+        },
+        {
+          "bone": "cf_j_toes_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 7
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 13
+        },
+        {
+          "bone": "cf_j_toes_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 7
+        }
+      ],
+      "validation": true
+    },
+    {
+      "name": "heldout_down",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -14
+        },
+        {
+          "bone": "cf_j_toes_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -8
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -14
+        },
+        {
+          "bone": "cf_j_toes_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": -8
+        }
+      ],
+      "validation": true
+    },
+    {
+      "name": "heldout_tilt",
+      "controls": [
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 5
+        },
+        {
+          "bone": "cf_j_foot_L",
+          "axis": [
+            0,
+            -1,
+            0
+          ],
+          "degrees": 7
+        },
+        {
+          "bone": "cf_j_toes_L",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 11
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 5
+        },
+        {
+          "bone": "cf_j_foot_R",
+          "axis": [
+            0,
+            -1,
+            0
+          ],
+          "degrees": -7
+        },
+        {
+          "bone": "cf_j_toes_R",
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "degrees": 11
+        }
+      ],
+      "validation": true
+    }
+  ],
+  "candidate_rings": 2,
+  "pose_preset": {
+    "id": "FLAT_SHOE_V1",
+    "random_enabled": true,
+    "random_count": 6,
+    "random_weight": 0.15,
+    "seed": 20260919
+  }
+}

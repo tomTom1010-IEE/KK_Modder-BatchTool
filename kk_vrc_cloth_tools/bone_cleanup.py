@@ -660,7 +660,7 @@ def matches_patterns(name, patterns):
     return any(fnmatch.fnmatchcase(name, pattern) for pattern in patterns)
 
 
-def cleanup_hair_tip_placeholders(armature_obj, patterns, merge_weighted, mode, do_apply):
+def cleanup_hair_tip_placeholders(armature_obj, patterns, merge_weighted, mode, do_apply, remove_vertex_groups=False):
     children_map = get_children_map(armature_obj)
     candidates = [
         bone.name
@@ -684,6 +684,15 @@ def cleanup_hair_tip_placeholders(armature_obj, patterns, merge_weighted, mode, 
 
     skipped_weighted = [] if merge_weighted else weighted
     to_delete = list(unweighted) + (weighted if merge_weighted else [])
+    # A weighted root has nowhere to transfer its influence. Never drop it.
+    no_parent = [n for n in to_delete if n in weighted and armature_obj.data.bones[n].parent is None]
+    to_delete = [n for n in to_delete if n not in no_parent]
+    skipped_weighted += no_parent
+    group_cleanup = [
+        {'mesh': mesh.name, 'group': name}
+        for mesh in get_armature_meshes(armature_obj) for name in to_delete
+        if remove_vertex_groups and mesh.vertex_groups.get(name) is not None
+    ]
 
     if not do_apply:
         return {
@@ -693,6 +702,7 @@ def cleanup_hair_tip_placeholders(armature_obj, patterns, merge_weighted, mode, 
             "weighted_tips": weighted,
             "skipped_weighted": skipped_weighted,
             "affected_vertices": 0,
+            "vertex_groups_to_remove": group_cleanup,
         }
 
     affected_vertices = 0
@@ -709,6 +719,12 @@ def cleanup_hair_tip_placeholders(armature_obj, patterns, merge_weighted, mode, 
             continue
         remove_single_bone_graft_children(armature_obj, bone_name)
 
+    for item in group_cleanup:
+        mesh = bpy.data.objects[item['mesh']]
+        group = mesh.vertex_groups.get(item['group'])
+        if group is not None:
+            mesh.vertex_groups.remove(group)
+
     return {
         "mesh": armature_obj.name,
         "deleted_bones": to_delete,
@@ -717,6 +733,7 @@ def cleanup_hair_tip_placeholders(armature_obj, patterns, merge_weighted, mode, 
         "weighted_tips": weighted,
         "skipped_weighted": skipped_weighted,
         "affected_vertices": affected_vertices,
+        "removed_vertex_groups": group_cleanup,
     }
 
 
@@ -1284,6 +1301,7 @@ class KKVRC_OT_cleanup_hair_tip_placeholders(bpy.types.Operator):
                 props.cleanup_merge_weighted_hair_tips,
                 props.cleanup_delete_mode,
                 do_apply,
+                remove_vertex_groups=props.cleanup_remove_tip_vertex_groups,
             )
         except Exception as ex:
             restore_error = restore_armature_interaction(context, armature_obj, interaction_state) if armature_obj else None
