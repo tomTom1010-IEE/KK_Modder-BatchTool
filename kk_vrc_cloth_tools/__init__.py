@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 tomTom. See LICENSE and NOTICE.md.
+
 bl_info = {
     "name": "KK/VRC Cloth Tools",
     "author": "Tom Xu + Codex",

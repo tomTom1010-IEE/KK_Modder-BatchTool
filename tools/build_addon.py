@@ -6,6 +6,8 @@ def build(destination):
     repo=Path(__file__).resolve().parents[1];package=repo/'kk_vrc_cloth_tools'
     destination=Path(destination);destination.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(destination,'w',zipfile.ZIP_DEFLATED) as archive:
+        for name in ('LICENSE', 'NOTICE.md'):
+            archive.write(repo/name, 'kk_vrc_cloth_tools/'+name)
         for path in sorted(package.rglob('*.py')):
             if '__pycache__' not in path.parts:archive.write(path,'kk_vrc_cloth_tools/'+path.relative_to(package).as_posix())
         for path in sorted((repo/'bone_profiles').glob('*.json')):

@@ -4,7 +4,7 @@
 Implementation snapshot: **0.2.17** · September 20, 2026  
 Project: [tomTom1010-IEE/KK_Modder-BatchTool](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool)
 
-[Project page](../README.md) · [User manual](../USER_GUIDE.md)
+[Paper: SBCST (PDF)](paper/SBCST.pdf) · [Project page](../README.md) · [User manual](../USER_GUIDE.md)
 
 **September 21 extension:** the [VRC/MMD performance showcase](performance-showcase.md) adds the later constraint-aware MMD skirt-outfit experiment and its collision-review qualifications. The implementation discussion below retains its September 20 snapshot; references to untested skirts describe that earlier snapshot.
 

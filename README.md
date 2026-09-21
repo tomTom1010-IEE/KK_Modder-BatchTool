@@ -2,19 +2,21 @@
 
 # KK Modder BatchTool
 
-### Garment weight transfer with semantic budgets and pose-based refinement
+### SBCST: Semantic Budget-Constrained Skinning Transfer
 
 **Preserve authored body–dynamic influence. Adapt the body weights to a new character.**
 
-[Technical Report](docs/technical-report.md) · [User Guide](USER_GUIDE.md) · [Downloads](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases) · [License](LICENSE)
+[Paper](docs/paper/SBCST.pdf) · [Technical Report](docs/technical-report.md) · [User Guide](USER_GUIDE.md) · [Downloads](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases) · [License](LICENSE)
 
-Blender add-on **0.2.24** · Blender **4.3+ declared minimum** · Local case studies on **Blender 5.2** · MIT
+Blender add-on **0.2.24** · Blender **4.3+ declared minimum** · Local case studies on **Blender 5.2** · AGPL-3.0-only
 
 </div>
 
 ![Preserve semantic influence budgets, choose garment response or shoe spatial fitting, and independently validate the result.](docs/assets/workflow.svg)
 
 *Method overview, not a rendered before/after result.*
+
+**SBCST paper:** *Semantic Budget-Constrained Skinning Transfer for Garment Retargeting*, a 10-page technical manuscript presenting the general formulation, constrained optimization, scoped contact review, and quantitative case studies. [Read the PDF](docs/paper/SBCST.pdf) · [LaTeX source and build instructions](docs/paper/README.md). The paper is an independent technical manuscript, not a peer-reviewed publication.
 
 ## What it does
 
@@ -120,4 +122,12 @@ The packaged skills retain their tested workflow guidance, including some histor
 
 Original and fitted garment meshes must retain vertex correspondence; source and target bodies need not share topology. Existing skeletons and bone transforms are used, not learned. Automatic suggestions do not establish bone semantics, and passing discrete poses is not a guarantee against all collisions. The later MMD skirt-outfit case uses a frozen fitted-mesh source reference and is documented in the [performance showcase](docs/performance-showcase.md).
 
-The [technical report](docs/technical-report.md) discusses SSDR and bounded biharmonic weights as related work. This project is not an implementation of SSDR, and makes no claim of outperforming it. Code is released under the [MIT License](LICENSE); third-party models, Blender, Unity packages, and solver dependencies retain their respective licenses.
+The [technical report](docs/technical-report.md) discusses SSDR and bounded biharmonic weights as related work. This project is not an implementation of SSDR, and makes no claim of outperforming it.
+
+## License and responsibility
+
+Copyright (c) 2026 tomTom. Unless otherwise stated, original project code and accompanying materials in this revision are licensed under the [GNU Affero General Public License, version 3 only](LICENSE) (`AGPL-3.0-only`). Third-party models, Blender, Unity packages, and solver dependencies retain their respective licenses. Previously released MIT versions remain available under their original terms; this change does not revoke those grants.
+
+Commercial use is permitted under the AGPL. Users are responsible for ensuring that their use of the plugin, input assets, and resulting outputs complies with applicable laws and third-party rights, including any permissions required for commercial activities. To the fullest extent permitted by applicable law, the authors and contributors disclaim liability for claims, losses, damages, or other legal consequences arising from users' commercial activities involving the plugin or its outputs.
+
+This responsibility statement clarifies the warranty and liability disclaimers in Sections 15–17 of the AGPL; it does not restrict commercial use, impose additional licensing conditions, or exclude liability that cannot legally be excluded. See [NOTICE.md](NOTICE.md).
