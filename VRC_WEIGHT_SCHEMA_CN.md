@@ -4,6 +4,16 @@
 
 这里是本项目识别的命名/模型配置，不是 VRChat 强制所有 avatar 使用这些名字。Unity Humanoid 槽位、模型自有身体变形骨和衣物动骨是不同概念。未知骨、胸部辅助链等必须结合实际绑定判断；不能把非 Humanoid 一律当动骨，也不能把辅助骨一律当无效权重。
 
+## Chocolat 配置补录（2026-09-27）
+
+已只读核对 `Chocolat` 与 `Chocolat_kaihen` 的实际父链、素体及默认衣物的正权重。共同骨名在原记录的 `avatars` 中加入 `AVATAR_CHOCOLAT`；独有的紧凑手指名和胸链单独登记，保留原 `VrcBoneRule` 字段及 Shinano 配置。
+
+同名 `Hand`、`Foot` 的父链在两种 avatar 中不同：通过 `VRC_BONE_PARENT_OVERRIDES` 和 `vrc_bone_parents` 显式记录，不覆盖原 `parent`。审查函数可指定 avatar；未指定时仅接受已维护的父链变体。
+
+本次导入使用 `Breast_L/R.001` 等名称，并不是用户截图的 `Breast_L/R_001`。不作全局标点替换猜测。默认衣物、毛发及附属肢体骨链不混入身体规则；无权重的 `_end` 身体末端标记为锚点并保持 REVIEW，不当作缺失的手指末节或脚趾。
+
+详细观察、数据范围及目标映射边界见 [Chocolat profile](docs/chocolat-bone-profile.md)。
+
 ## 两张拓扑表的定位
 
 - `Armature_armature_topology_VRC.json`：历史 VRC 样本的完整拓扑快照，603 根骨。

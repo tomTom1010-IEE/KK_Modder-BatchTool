@@ -4,7 +4,7 @@ from collections import deque
 import bpy
 
 from . import common
-from .vrc_bone_rules import TAG_VRC_SHINANO_SUPPORT, TAG_VRC_BREAST_CHAIN, VRC_SPECIAL_GROUPS
+from .vrc_bone_rules import TAG_VRC_GRAFT_STOP, VRC_SPECIAL_GROUPS
 
 
 PRIORITY_1_NAME_OVERRIDES = {
@@ -176,11 +176,10 @@ VRC_HUMANOID_BONES = {
     "Little Distal.R",
 }
 
-# This legacy exclusion set also contains avatar-specific body helpers.
-# Use the Shinano library rather than mistaking non-Humanoid helpers for cloth.
-VRC_HUMANOID_BONES.update(VRC_SPECIAL_GROUPS[TAG_VRC_SHINANO_SUPPORT])
-# Shinano body deformation chains are graft exclusions, not Unity Humanoid slots.
-VRC_HUMANOID_BONES.update(VRC_SPECIAL_GROUPS[TAG_VRC_BREAST_CHAIN])
+# Despite its legacy name this is the graft exclusion set, not a claim that
+# helpers/endpoints are Unity Humanoid slots. Consume the shared rule tag so
+# Chocolat's compact fingers and body endpoints cannot become clothing roots.
+VRC_HUMANOID_BONES.update(VRC_SPECIAL_GROUPS[TAG_VRC_GRAFT_STOP])
 
 GRAFTABLE_SOURCE_PARENTS = set(PARENT_ATTACHMENT_MAPS["WAIST"]) | set(VRC_TO_KK_LIMB_PARENT_MAP)
 

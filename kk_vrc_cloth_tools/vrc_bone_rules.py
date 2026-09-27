@@ -33,6 +33,7 @@ class VrcBoneRule(NamedTuple):
 
 AVATAR_GENERIC = "generic"
 AVATAR_SHINANO = "shinano"
+AVATAR_CHOCOLAT = "chocolat"
 
 REGION_EYE = "eye"
 REGION_TAIL = "tail"
@@ -50,6 +51,8 @@ TAG_VRC_EYE = "vrc_eye"
 TAG_VRC_BREAST_CHAIN = "vrc_breast_chain"
 TAG_VRC_BUTT = "vrc_butt"
 TAG_VRC_ARM_SUPPORT = "vrc_arm_support"
+TAG_VRC_CHOCOLAT_BODY = "vrc_chocolat_body"
+TAG_VRC_BODY_ENDPOINT = "vrc_body_endpoint"
 
 
 def _vrc_side(name):
@@ -91,29 +94,30 @@ def _add_vrc_pair(base_left, base_right, role, regions, parent_left, parent_righ
 
 
 _GENERIC_VRC_AVATARS = (AVATAR_GENERIC, AVATAR_SHINANO)
+_SHARED_VRC_AVATARS = (AVATAR_GENERIC, AVATAR_SHINANO, AVATAR_CHOCOLAT)
 _GENERIC_TAGS = (TAG_VRC_HUMANOID, TAG_VRC_REPLACEABLE_BODY, TAG_VRC_GRAFT_STOP)
 
-_add_vrc_bone("Hips", ROLE_MOTION, (REGION_TORSO, REGION_LOWER_BODY), None, _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO, TAG_TRANSFER_SAFE_LEG), _GENERIC_VRC_AVATARS)
-_add_vrc_bone("Spine", ROLE_MOTION, (REGION_TORSO,), "Hips", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO,), _GENERIC_VRC_AVATARS)
-_add_vrc_bone("Chest", ROLE_MOTION, (REGION_TORSO,), "Spine", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO,), _GENERIC_VRC_AVATARS)
-_add_vrc_bone("Neck", ROLE_MOTION, (REGION_TORSO,), "Chest", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO,), _GENERIC_VRC_AVATARS)
-_add_vrc_bone("Head", ROLE_MOTION, (REGION_TORSO,), "Neck", _GENERIC_TAGS, _GENERIC_VRC_AVATARS)
-_add_vrc_bone("LeftEye", ROLE_MOTION, (REGION_EYE,), "Head", (TAG_VRC_EYE, TAG_VRC_GRAFT_STOP), (AVATAR_SHINANO,), "L")
-_add_vrc_bone("RightEye", ROLE_MOTION, (REGION_EYE,), "Head", (TAG_VRC_EYE, TAG_VRC_GRAFT_STOP), (AVATAR_SHINANO,), "R")
+_add_vrc_bone("Hips", ROLE_MOTION, (REGION_TORSO, REGION_LOWER_BODY), None, _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO, TAG_TRANSFER_SAFE_LEG), _SHARED_VRC_AVATARS)
+_add_vrc_bone("Spine", ROLE_MOTION, (REGION_TORSO,), "Hips", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO,), _SHARED_VRC_AVATARS)
+_add_vrc_bone("Chest", ROLE_MOTION, (REGION_TORSO,), "Spine", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO,), _SHARED_VRC_AVATARS)
+_add_vrc_bone("Neck", ROLE_MOTION, (REGION_TORSO,), "Chest", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_TORSO,), _SHARED_VRC_AVATARS)
+_add_vrc_bone("Head", ROLE_MOTION, (REGION_TORSO,), "Neck", _GENERIC_TAGS, _SHARED_VRC_AVATARS)
+_add_vrc_bone("LeftEye", ROLE_MOTION, (REGION_EYE,), "Head", (TAG_VRC_EYE, TAG_VRC_GRAFT_STOP), (AVATAR_SHINANO, AVATAR_CHOCOLAT), "L")
+_add_vrc_bone("RightEye", ROLE_MOTION, (REGION_EYE,), "Head", (TAG_VRC_EYE, TAG_VRC_GRAFT_STOP), (AVATAR_SHINANO, AVATAR_CHOCOLAT), "R")
 
 for _side in ("L", "R"):
-    _add_vrc_bone(f"Shoulder.{_side}", ROLE_MOTION, (REGION_ARM,), "Chest", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM, TAG_TRANSFER_SAFE_TORSO), _GENERIC_VRC_AVATARS, _side)
+    _add_vrc_bone(f"Shoulder.{_side}", ROLE_MOTION, (REGION_ARM,), "Chest", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM, TAG_TRANSFER_SAFE_TORSO), _SHARED_VRC_AVATARS, _side)
     _add_vrc_bone(f"Upper_arm.{_side}", ROLE_MOTION, (REGION_ARM,), f"Shoulder.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), _GENERIC_VRC_AVATARS, _side)
-    _add_vrc_bone(f"UpperArm.{_side}", ROLE_MOTION, (REGION_ARM,), f"Shoulder.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), (AVATAR_GENERIC,), _side)
+    _add_vrc_bone(f"UpperArm.{_side}", ROLE_MOTION, (REGION_ARM,), f"Shoulder.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), (AVATAR_GENERIC, AVATAR_CHOCOLAT), _side)
     _add_vrc_bone(f"Lower_arm.{_side}", ROLE_MOTION, (REGION_ARM,), f"Upper_arm.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), _GENERIC_VRC_AVATARS, _side)
-    _add_vrc_bone(f"LowerArm.{_side}", ROLE_MOTION, (REGION_ARM,), f"UpperArm.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), (AVATAR_GENERIC,), _side)
-    _add_vrc_bone(f"Hand.{_side}", ROLE_MOTION, (REGION_HAND,), f"Lower_arm.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), _GENERIC_VRC_AVATARS, _side)
+    _add_vrc_bone(f"LowerArm.{_side}", ROLE_MOTION, (REGION_ARM,), f"UpperArm.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), (AVATAR_GENERIC, AVATAR_CHOCOLAT), _side)
+    _add_vrc_bone(f"Hand.{_side}", ROLE_MOTION, (REGION_HAND,), f"Lower_arm.{_side}", _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), _SHARED_VRC_AVATARS, _side)
     _add_vrc_bone(f"Upper_leg.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), "Hips", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), _GENERIC_VRC_AVATARS, _side)
-    _add_vrc_bone(f"UpperLeg.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), "Hips", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), (AVATAR_GENERIC,), _side)
+    _add_vrc_bone(f"UpperLeg.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), "Hips", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), (AVATAR_GENERIC, AVATAR_CHOCOLAT), _side)
     _add_vrc_bone(f"Lower_leg.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), f"Upper_leg.{_side}", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), _GENERIC_VRC_AVATARS, _side)
-    _add_vrc_bone(f"LowerLeg.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), f"UpperLeg.{_side}", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), (AVATAR_GENERIC,), _side)
-    _add_vrc_bone(f"Foot.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), f"Lower_leg.{_side}", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), _GENERIC_VRC_AVATARS, _side)
-    _add_vrc_bone(f"Toe.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), f"Foot.{_side}", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), _GENERIC_VRC_AVATARS, _side)
+    _add_vrc_bone(f"LowerLeg.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), f"UpperLeg.{_side}", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), (AVATAR_GENERIC, AVATAR_CHOCOLAT), _side)
+    _add_vrc_bone(f"Foot.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), f"Lower_leg.{_side}", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), _SHARED_VRC_AVATARS, _side)
+    _add_vrc_bone(f"Toe.{_side}", ROLE_MOTION, (REGION_LEG, REGION_LOWER_BODY), f"Foot.{_side}", _GENERIC_TAGS + (TAG_LOWER_BODY_LIMB, TAG_LOWER_BODY_WITH_SIRI, TAG_TRANSFER_SAFE_LEG), _SHARED_VRC_AVATARS, _side)
 
     _add_vrc_bone(f"Upper_arm_support.{_side}", ROLE_ASSIST, (REGION_ARM,), f"Upper_arm.{_side}", (TAG_VRC_SHINANO_BODY, TAG_VRC_SHINANO_SUPPORT, TAG_VRC_ARM_SUPPORT, TAG_VRC_REPLACEABLE_BODY, TAG_VRC_GRAFT_STOP, TAG_TRANSFER_SAFE_ARM), (AVATAR_SHINANO,), _side)
     _add_vrc_bone(f"Lower_arm_support.{_side}", ROLE_ASSIST, (REGION_ARM,), f"Lower_arm.{_side}", (TAG_VRC_SHINANO_BODY, TAG_VRC_SHINANO_SUPPORT, TAG_VRC_ARM_SUPPORT, TAG_VRC_REPLACEABLE_BODY, TAG_VRC_GRAFT_STOP, TAG_TRANSFER_SAFE_ARM), (AVATAR_SHINANO,), _side)
@@ -143,6 +147,37 @@ for _side in ("L", "R"):
     for _base, _parent in _parents.items():
         _add_vrc_bone(f"{_base}.{_side}", ROLE_MOTION, (REGION_HAND,), _parent, _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), _GENERIC_VRC_AVATARS, _side)
 
+# Chocolat and Chocolat_kaihen were inspected together. Both use these compact
+# finger names and breast chains. Kaihen omits distal fingers/toes; absence does
+# not make its unweighted *_end markers equivalent to those deform bones.
+for _side in ("L", "R"):
+    for _finger in ("Thumb", "Index", "Middle", "Ring", "Little"):
+        _parent = f"Hand.{_side}"
+        for _joint in ("Proximal", "Intermediate", "Distal"):
+            _name = f"{_finger}{_joint}.{_side}"
+            _add_vrc_bone(_name, ROLE_MOTION, (REGION_HAND,), _parent, _GENERIC_TAGS + (TAG_TRANSFER_SAFE_ARM,), (AVATAR_CHOCOLAT,), _side)
+            _parent = _name
+        _add_vrc_bone(f"{_finger}Intermediate.{_side}_end", ROLE_ANCHOR, (REGION_HAND,), f"{_finger}Intermediate.{_side}", (TAG_VRC_BODY_ENDPOINT, TAG_VRC_GRAFT_STOP), (AVATAR_CHOCOLAT,), _side)
+
+    _breast_tags = (TAG_VRC_CHOCOLAT_BODY, TAG_VRC_BREAST_CHAIN, TAG_VRC_REPLACEABLE_BODY, TAG_VRC_GRAFT_STOP, TAG_TRANSFER_SAFE_TORSO)
+    _add_vrc_bone(f"Breast_{_side}_Root", ROLE_ASSIST, (REGION_BREAST,), "Chest", _breast_tags, (AVATAR_CHOCOLAT,), _side)
+    _add_vrc_bone(f"Breast_{_side}.001", ROLE_ASSIST, (REGION_BREAST,), f"Breast_{_side}_Root", _breast_tags, (AVATAR_CHOCOLAT,), _side)
+    _add_vrc_bone(f"Breast_{_side}.002", ROLE_ASSIST, (REGION_BREAST,), f"Breast_{_side}.001", _breast_tags, (AVATAR_CHOCOLAT,), _side)
+    _add_vrc_bone(f"Breast_{_side}.002_end", ROLE_ANCHOR, (REGION_BREAST,), f"Breast_{_side}.002", (TAG_VRC_BODY_ENDPOINT, TAG_VRC_GRAFT_STOP), (AVATAR_CHOCOLAT,), _side)
+    _add_vrc_bone(f"Foot.{_side}_end", ROLE_ANCHOR, (REGION_LEG,), f"Foot.{_side}", (TAG_VRC_BODY_ENDPOINT, TAG_VRC_GRAFT_STOP), (AVATAR_CHOCOLAT,), _side)
+    _eye = "LeftEye" if _side == "L" else "RightEye"
+    _add_vrc_bone(_eye + "_end", ROLE_ANCHOR, (REGION_EYE,), _eye, (TAG_VRC_BODY_ENDPOINT, TAG_VRC_GRAFT_STOP), (AVATAR_CHOCOLAT,), _side)
+
+# Shared names keep the historical parent in VrcBoneRule. Avatar-specific
+# parent alternatives are explicit; never overwrite Shinano's Hand/Foot chain.
+VRC_BONE_PARENT_OVERRIDES = {
+    AVATAR_CHOCOLAT: {
+        **{f"Hand.{side}": f"LowerArm.{side}" for side in ("L", "R")},
+        **{f"Foot.{side}": f"LowerLeg.{side}" for side in ("L", "R")},
+    },
+}
+
+
 def _make_vrc_rule(name, data):
     return VrcBoneRule(
         name=name,
@@ -160,7 +195,7 @@ VRC_STANDARD_BODY_BONE_NAMES = frozenset(VRC_STANDARD_BODY_BONES)
 VRC_STANDARD_BONE_PARENTS = {name: rule.parent for name, rule in VRC_STANDARD_BODY_BONES.items()}
 VRC_BONES_BY_AVATAR = {
     avatar: frozenset(name for name, rule in VRC_STANDARD_BODY_BONES.items() if avatar in rule.avatars)
-    for avatar in (AVATAR_GENERIC, AVATAR_SHINANO)
+    for avatar in (AVATAR_GENERIC, AVATAR_SHINANO, AVATAR_CHOCOLAT)
 }
 VRC_BONES_BY_REGION = {
     region: frozenset(name for name, rule in VRC_STANDARD_BODY_BONES.items() if region in rule.regions)
@@ -190,6 +225,8 @@ VRC_SPECIAL_GROUPS = {
     TAG_VRC_BREAST_CHAIN: frozenset(name for name, rule in VRC_STANDARD_BODY_BONES.items() if TAG_VRC_BREAST_CHAIN in rule.tags),
     TAG_VRC_BUTT: frozenset(name for name, rule in VRC_STANDARD_BODY_BONES.items() if TAG_VRC_BUTT in rule.tags),
     TAG_VRC_ARM_SUPPORT: frozenset(name for name, rule in VRC_STANDARD_BODY_BONES.items() if TAG_VRC_ARM_SUPPORT in rule.tags),
+    TAG_VRC_CHOCOLAT_BODY: frozenset(name for name, rule in VRC_STANDARD_BODY_BONES.items() if TAG_VRC_CHOCOLAT_BODY in rule.tags),
+    TAG_VRC_BODY_ENDPOINT: frozenset(name for name, rule in VRC_STANDARD_BODY_BONES.items() if TAG_VRC_BODY_ENDPOINT in rule.tags),
 }
 
 
@@ -233,6 +270,20 @@ def vrc_bone_tags(name):
 def vrc_bone_avatars(name):
     rule = VRC_STANDARD_BODY_BONES.get(name)
     return rule.avatars if rule else frozenset()
+
+
+def vrc_bone_parents(name, avatar=None):
+    """Allowed profile parents, not a heuristic based on similar spelling.
+
+    Without a selected avatar accept the explicitly maintained alternatives;
+    with one, return only that profile's parent. Unknown names/profiles have no
+    declared parent. A known root is represented by frozenset({None}).
+    """
+    rule = VRC_STANDARD_BODY_BONES.get(name)
+    if rule is None or (avatar is not None and avatar not in rule.avatars):
+        return frozenset()
+    profiles = rule.avatars if avatar is None else (avatar,)
+    return frozenset(VRC_BONE_PARENT_OVERRIDES.get(a, {}).get(name, rule.parent) for a in profiles)
 
 
 class VrcWeightPolicy(NamedTuple):
@@ -280,7 +331,7 @@ for _side in ('L','R'):
         for _alias in _aliases:VRC_MOTION_SEMANTICS[f'{_alias}.{_side}']=f'{_semantic}_{_side}'
 
 
-def audit_vrc_weight_roles(rows, bones, roles):
+def audit_vrc_weight_roles(rows, bones, roles, avatar=None):
     """Pure-data audit. bones: name -> {parent, use_deform} from live rig.
 
     Unknown cloth chains stay unclassified. Non-Humanoid does not imply
@@ -294,7 +345,7 @@ def audit_vrc_weight_roles(rows, bones, roles):
         if policy is None or bone is None:
             continue
         observed[name] = policy._asdict()
-        if bone.get('parent') != VRC_STANDARD_BONE_PARENTS[name]:
+        if bone.get('parent') not in vrc_bone_parents(name, avatar):
             hierarchy.append(name)
         if bone.get('use_deform') and roles.get(name) in {'DROP', 'IGNORE'}:
             conflicts.append(name)
