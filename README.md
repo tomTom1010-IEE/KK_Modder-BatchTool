@@ -8,7 +8,7 @@
 
 [Paper](docs/paper/SBCST.pdf) · [Technical Report](docs/technical-report.md) · [User Guide](USER_GUIDE.md) · [Downloads](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases) · [License](LICENSE)
 
-Blender add-on **0.3.0** · Blender **4.3+ declared minimum** · Local case studies on **Blender 5.2** · AGPL-3.0-only
+Blender add-on **2.5.1** · Blender **4.3+ declared minimum** · Local case studies on **Blender 5.2** · AGPL-3.0-only
 
 </div>
 
@@ -33,7 +33,9 @@ Two complementary workflows share the same principle:
 
 The add-on also includes bone grafting, a conservative beginner workflow, whole-chain export cleanup, MMD garment preprocessing, and a companion Unity component-setup tool. **Static garment modeling and runtime cloth/secondary-motion simulation remain separate tasks.**
 
-**Total influence compatibility (0.3.0):** new configurations default to four total influences per vertex, counting body bones, retained dynamics, and enabled fingers together. Legacy configurations and API contexts without an explicit policy retain unlimited behavior. Budget-aware support selection precedes continuous optimization; optional dynamic approximation is **off by default**. Unresolved vertices remain unchanged and are reported, so successful fitting does not necessarily mean strict four-influence compatibility. The shared **Runtime influence compatibility** box appears in the beginner panel, garment Stage 3, and the shoe panel. [Controls and limits](docs/influence-limits.md) · [User instructions](USER_GUIDE.md#choose-a-total-influence-policy).
+**Total influence compatibility (2.5.1):** new configurations default to four total influences per vertex, counting body bones, retained dynamics, and enabled fingers together. Legacy configurations and API contexts without an explicit policy retain unlimited behavior. Budget-aware support selection precedes continuous optimization; optional dynamic approximation is **off by default**. Unresolved vertices remain unchanged and are reported, so successful fitting does not necessarily mean strict four-influence compatibility. The shared **Runtime influence compatibility** box appears in the beginner panel, garment Stage 3, and the shoe panel. [Controls and limits](docs/influence-limits.md) · [User instructions](USER_GUIDE.md#choose-a-total-influence-policy).
+
+The **2.x** release line denotes the optimization-based workflow. **2.5** refines total-influence-constrained fitting; the **.1** patch adds compatibility for terminal `.` / `_` bone-name separators and related small fixes. The core SBCST method is retained.
 
 ### Four-influence deployment study
 

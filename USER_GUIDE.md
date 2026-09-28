@@ -2,7 +2,7 @@
 
 [Project showcase](README.md) · [Technical report](docs/technical-report.md)
 
-**Updated for source version 0.3.0, September 28, 2026**, including total-influence controls and the Stage 3 panel-drawing fix. Updating the add-on does not automatically modify existing scene weights or repair earlier results.
+**Updated for source version 2.5.1, September 28, 2026**, including total-influence controls and the Stage 3 panel-drawing fix. Updating the add-on does not automatically modify existing scene weights or repair earlier results.
 
 The garment execution controls below follow the current source UI. English labels have Simplified Chinese localization; see [localization notes](LOCALIZATION.md). Older screenshots and the historical [0.2.20 workflow notes](docs/WEIGHT_WORKFLOW_0_2_20_CN.md) may use different wording. Repository changes take effect in Blender only after updating the installed add-on and reloading it.
 
@@ -10,7 +10,7 @@ The garment execution controls below follow the current source UI. English label
 
 The declared minimum is Blender 4.3. Local case studies used Blender 5.2; not every intervening version has been verified.
 
-1. Download the appropriate package from [Releases](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases). To build from source, run `python tools/build_addon.py /path/to/kk_vrc_cloth_tools-0.3.0.zip`, replacing the output path with your preferred location. The builder includes the required bone-profile JSON files. Do not ZIP only the source package folder or install the entire repository ZIP.
+1. Download the appropriate package from [Releases](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases). To build from source, run `python tools/build_addon.py /path/to/kk_vrc_cloth_tools-2.5.1.zip`, replacing the output path with your preferred location. The builder includes the required bone-profile JSON files. Do not ZIP only the source package folder or install the entire repository ZIP.
 2. Use **Edit → Preferences → Add-ons → Install from Disk…** and enable **KK/VRC Cloth Tools**. Reload the add-on or restart Blender after upgrading; check the installed version.
 3. Press **N** in the 3D Viewport and open **KK/VRC Tools**.
 
@@ -208,7 +208,7 @@ Garments produce initial, macro, and terminal copies; shoes produce A and an acc
 |---|---|
 | Missing direction/random settings | Expand manual directions, pose editing, or advanced settings |
 | Old Step 1–5 interface | Check installed path, version, and reload status; repository changes do not update Blender's installed copy |
-| Stage 3 shows only its title; shoe controls may also stop drawing | This is not a foldout. Install the current 0.3.0 source patch and reload/restart Blender. An earlier draw callback tried to write `influence_version` during drawing, producing `Writing to ID classes in this context is not allowed`; the patch makes drawing read-only. Do not clear your configuration to work around it. |
+| Stage 3 shows only its title; shoe controls may also stop drawing | This is not a foldout. Install the current 2.5.1 source patch and reload/restart Blender. An earlier draw callback tried to write `influence_version` during drawing, producing `Writing to ID classes in this context is not allowed`; the patch makes drawing read-only. Do not clear your configuration to work around it. |
 | An old file unexpectedly defaults to Four after a partial hot reload | Check the actual installed package and perform a complete reload/restart so the saved-configuration migration callback is registered. Review the policy before preparing weights. |
 | Solve succeeded but `RUNTIME_REVIEW_REQUIRED` remains | Inspect unchanged over-limit vertices. Motion/contact acceptance does not certify four-influence compatibility. |
 | Scan still describes a previous object or weights | Run **Scan influence counts** on the current workflow result again; inspect the object name in the report. |

@@ -8,6 +8,8 @@ tomTomIEE, revised September 28, 2026. Independent technical manuscript; not pee
 
 The paper presents the general semantic-budget formulation, feature-aware initialization, proportion-aware response transport, constrained body-weight optimization, terminal refinement, and the alternative flat-footwear spatial objective in a two-column academic layout. A separate **Deployment Extension: Total Influence Constraints** chapter covers the optional four-influence policy, the slot-feasibility bound, bounded support selection with continuous fitting, default-off dynamic approximation, and a controlled two-jacket dry run. It supplements the core method rather than rewriting the historical dense experiments.
 
+The accompanying software release is **2.5.1**. The deployment study retains the same measured numerical snapshot and hashes; renaming its earlier development label does not change the paper's results or historical baseline versions.
+
 ## Evidence and scope
 
 The paper uses the archived same-input jacket/skirt-outfit comparisons and the complex flat-shoe study. The four garment methods are native transfer, native transfer with the body/dynamic split preserved, SBCST initialization, and the final macro-plus-terminal result. The MMD-style case is a limited cross-rig applicability experiment, with explicit local contact review and recorded residual contacts; it is not presented as a strict global collision pass. The footwear study uses the standard-only pose set. Low-weight random sampling is implemented, but its incremental benefit is not claimed here.

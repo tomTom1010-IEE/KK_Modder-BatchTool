@@ -1,4 +1,4 @@
-# Total influence constraints in SBCST 0.3.0
+# Total influence constraints in SBCST 2.5.1
 
 [User guide](../USER_GUIDE.md#choose-a-total-influence-policy) · [Method report](technical-report.md#7-deployment-extension-total-influence-constraints) · [Controlled dry run](influence-limit-benchmark.md) · [Paper](paper/SBCST.pdf)
 

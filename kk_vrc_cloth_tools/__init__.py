@@ -4,7 +4,7 @@
 bl_info = {
     "name": "KK/VRC Cloth Tools",
     "author": "tomTomIEE + Codex",
-    "version": (0, 3, 0),
+    "version": (2, 5, 1),
     "blender": (4, 3, 0),
     "location": "View3D > Sidebar > KK/VRC Tools / model preprocess / mannual edit / config",
     "description": "Batch tools for grafting VRC clothing bones and remapping weights to Koikatsu armatures.",

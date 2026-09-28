@@ -1,8 +1,10 @@
 # Total-influence deployment study
 
-September 28, 2026 · SBCST 0.3.0 numerical snapshot
+September 28, 2026 · SBCST 2.5.1 numerical snapshot
 
 [Project](../README.md) · [User guide](../USER_GUIDE.md#choose-a-total-influence-policy) · [Method extension](influence-limits.md) · [Public measurements](data/influence-limit-benchmark.json) · [Paper](paper/SBCST.pdf)
+
+Release naming note: this numerical snapshot was measured under the development label `0.3.0` and is distributed as **2.5.1**. The original label remains in the JSON provenance; source hashes and measurements are unchanged.
 
 ## Question and protocol
 

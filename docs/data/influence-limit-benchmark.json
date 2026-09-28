@@ -3,7 +3,7 @@
   "date": "2026-09-28",
   "title": "SBCST total-influence dry run",
   "baseline_commit": "ccdadc0dd10137e7532044b08c12933b6ad334fd",
-  "candidate_version": "0.3.0 working-tree numerical snapshot",
+  "candidate_version": "2.5.1 (release label for the same numerical snapshot)",
   "dynamic_compression": false,
   "scene_writeback": false,
   "unity_runtime_tested": false,
@@ -592,5 +592,7 @@
     "Preserved over-limit rows are exceptions, not strict four-influence compliance.",
     "Public extracts reproduce table arithmetic; private scene assets and complete contexts are not redistributed.",
     "No continuous-time collision guarantee or Unity import/frame-rate measurement."
-  ]
+  ],
+  "candidate_version_at_measurement": "0.3.0 working-tree numerical snapshot",
+  "version_note": "The measured working tree was labeled 0.3.0 before the release was renamed to 2.5.1. Numerical source hashes, inputs and measurements are unchanged."
 }

@@ -2,7 +2,7 @@
 
 **KK Modder BatchTool — Technical Report**
 
-Implementation update: **0.3.0** · September 28, 2026
+Implementation update: **2.5.1** · September 28, 2026
 
 Project: [tomTom1010-IEE/KK_Modder-BatchTool](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool)
 
