@@ -5,6 +5,8 @@ import bpy
 
 from . import common
 from .vrc_bone_rules import TAG_VRC_GRAFT_STOP, VRC_SPECIAL_GROUPS
+from .vrc_kk_mapping import VRC_TO_KK_LIMB_TARGETS, VRC_BREAST_ROOT_ATTACHMENTS
+from . import bone_names
 
 
 PRIORITY_1_NAME_OVERRIDES = {
@@ -12,93 +14,30 @@ PRIORITY_1_NAME_OVERRIDES = {
     "CYCRBowknotRoot": "cf_j_spine03",
 }
 
-PRIORITY_2_NAME_OVERRIDES = {
-    "Breast_root.L": "cf_d_bust00",
-    "Breast_root.R": "cf_d_bust00",
-}
+PRIORITY_2_NAME_OVERRIDES = dict(VRC_BREAST_ROOT_ATTACHMENTS)
 
 PARENT_ATTACHMENT_MAPS = {
     "PELVIS": {
         "Hips": "cf_j_hips",
         "Spine": "cf_j_spine01",
         "Chest": "cf_j_spine03",
-        "Breast_root.L": "cf_d_bust00",
-        "Breast_root.R": "cf_d_bust00",
+        **VRC_BREAST_ROOT_ATTACHMENTS,
     },
     "WAIST": {
         "Hips": "cf_j_waist02",
         "Spine": "cf_j_waist01",
         "Chest": "cf_j_spine03",
-        "Breast_root.L": "cf_d_bust00",
-        "Breast_root.R": "cf_d_bust00",
+        **VRC_BREAST_ROOT_ATTACHMENTS,
     },
     "HIGH_WAIST": {
         "Hips": "cf_j_waist01",
         "Spine": "cf_j_spine01",
         "Chest": "cf_j_spine03",
-        "Breast_root.L": "cf_d_bust00",
-        "Breast_root.R": "cf_d_bust00",
+        **VRC_BREAST_ROOT_ATTACHMENTS,
     },
 }
 
-VRC_TO_KK_LIMB_PARENT_MAP = {
-    "Neck": "cf_j_neck",
-    "Head": "cf_j_head",
-    "Shoulder.L": "cf_j_shoulder_L",
-    "Upper_arm.L": "cf_j_arm00_L",
-    "UpperArm.L": "cf_j_arm00_L",
-    "Lower_arm.L": "cf_j_forearm01_L",
-    "LowerArm.L": "cf_j_forearm01_L",
-    "Hand.L": "cf_j_hand_L",
-    "Shoulder.R": "cf_j_shoulder_R",
-    "Upper_arm.R": "cf_j_arm00_R",
-    "UpperArm.R": "cf_j_arm00_R",
-    "Lower_arm.R": "cf_j_forearm01_R",
-    "LowerArm.R": "cf_j_forearm01_R",
-    "Hand.R": "cf_j_hand_R",
-    "Upper_leg.L": "cf_j_thigh00_L",
-    "UpperLeg.L": "cf_j_thigh00_L",
-    "Lower_leg.L": "cf_j_leg01_L",
-    "LowerLeg.L": "cf_j_leg01_L",
-    "Foot.L": "cf_j_foot_L",
-    "Toe.L": "cf_j_toes_L",
-    "Upper_leg.R": "cf_j_thigh00_R",
-    "UpperLeg.R": "cf_j_thigh00_R",
-    "Lower_leg.R": "cf_j_leg01_R",
-    "LowerLeg.R": "cf_j_leg01_R",
-    "Foot.R": "cf_j_foot_R",
-    "Toe.R": "cf_j_toes_R",
-    "Thumb Proximal.L": "cf_j_thumb01_L",
-    "Thumb Intermediate.L": "cf_j_thumb02_L",
-    "Thumb Distal.L": "cf_j_thumb03_L",
-    "Index Proximal.L": "cf_j_index01_L",
-    "Index Intermediate.L": "cf_j_index02_L",
-    "Index Distal.L": "cf_j_index03_L",
-    "Middle Proximal.L": "cf_j_middle01_L",
-    "Middle Intermediate.L": "cf_j_middle02_L",
-    "Middle Distal.L": "cf_j_middle03_L",
-    "Ring Proximal.L": "cf_j_ring01_L",
-    "Ring Intermediate.L": "cf_j_ring02_L",
-    "Ring Distal.L": "cf_j_ring03_L",
-    "Little Proximal.L": "cf_j_little01_L",
-    "Little Intermediate.L": "cf_j_little02_L",
-    "Little Distal.L": "cf_j_little03_L",
-    "Thumb Proximal.R": "cf_j_thumb01_R",
-    "Thumb Intermediate.R": "cf_j_thumb02_R",
-    "Thumb Distal.R": "cf_j_thumb03_R",
-    "Index Proximal.R": "cf_j_index01_R",
-    "Index Intermediate.R": "cf_j_index02_R",
-    "Index Distal.R": "cf_j_index03_R",
-    "Middle Proximal.R": "cf_j_middle01_R",
-    "Middle Intermediate.R": "cf_j_middle02_R",
-    "Middle Distal.R": "cf_j_middle03_R",
-    "Ring Proximal.R": "cf_j_ring01_R",
-    "Ring Intermediate.R": "cf_j_ring02_R",
-    "Ring Distal.R": "cf_j_ring03_R",
-    "Little Proximal.R": "cf_j_little01_R",
-    "Little Intermediate.R": "cf_j_little02_R",
-    "Little Distal.R": "cf_j_little03_R",
-}
+VRC_TO_KK_LIMB_PARENT_MAP = dict(VRC_TO_KK_LIMB_TARGETS)
 
 REPORT_ONLY_PATTERNS = (
     "CYCRGlove_*",
@@ -213,24 +152,26 @@ def matches_any_pattern(name, patterns):
 
 
 def is_priority_root(name):
-    return name in PRIORITY_1_NAME_OVERRIDES or name in PRIORITY_2_NAME_OVERRIDES
+    return bone_names.key(name, PRIORITY_1_NAME_OVERRIDES) is not None or bone_names.key(name, PRIORITY_2_NAME_OVERRIDES) is not None
 
 
 def get_parent_attachment_target(parent_name, attachment_mode):
-    torso_target = PARENT_ATTACHMENT_MAPS.get(attachment_mode, PARENT_ATTACHMENT_MAPS["WAIST"]).get(parent_name)
+    torso_target = bone_names.lookup(PARENT_ATTACHMENT_MAPS.get(attachment_mode, PARENT_ATTACHMENT_MAPS["WAIST"]),parent_name)
     if torso_target:
         return torso_target
-    return VRC_TO_KK_LIMB_PARENT_MAP.get(parent_name)
+    return bone_names.lookup(VRC_TO_KK_LIMB_PARENT_MAP,parent_name)
 
 
 def classify_candidate(name, parent_name, attachment_mode):
+    name=bone_names.canonical(name,set(PRIORITY_1_NAME_OVERRIDES)|set(PRIORITY_2_NAME_OVERRIDES))
+    parent_name=bone_names.canonical(parent_name,GRAFTABLE_SOURCE_PARENTS)
     if name in PRIORITY_1_NAME_OVERRIDES:
         return 1, PRIORITY_1_NAME_OVERRIDES[name], "priority 1 name override"
     if name in PRIORITY_2_NAME_OVERRIDES:
         return 2, PRIORITY_2_NAME_OVERRIDES[name], "priority 2 name override"
     parent_target = get_parent_attachment_target(parent_name, attachment_mode)
     if parent_target:
-        if parent_name in {"Breast_root.L", "Breast_root.R"}:
+        if parent_name in VRC_BREAST_ROOT_ATTACHMENTS:
             return 2, parent_target, "priority 2 parent-derived"
         if parent_name in VRC_TO_KK_LIMB_PARENT_MAP:
             return 1, parent_target, "priority 1 limb parent-derived"
@@ -241,13 +182,13 @@ def classify_candidate(name, parent_name, attachment_mode):
 
 
 def is_candidate_root(bone, children_map):
-    if bone.name in VRC_HUMANOID_BONES:
+    if bone_names.key(bone.name,VRC_HUMANOID_BONES) is not None:
         return False
     if is_priority_root(bone.name):
         return True
     if matches_any_pattern(bone.name, REPORT_ONLY_PATTERNS):
         return True
-    if bone.parent and bone.parent.name in GRAFTABLE_SOURCE_PARENTS:
+    if bone.parent and bone_names.key(bone.parent.name,GRAFTABLE_SOURCE_PARENTS) is not None:
         return True
     return False
 
@@ -262,6 +203,8 @@ def parent_is_inside_candidate(parent_name, candidate_roots, children_map):
 
 
 def scan_candidates(vrc_armature, kk_armature, attachment_mode="WAIST"):
+    bone_names.assert_unique(vrc_armature.data.bones.keys())
+    bone_names.assert_unique(kk_armature.data.bones.keys())
     children_map = get_children_map(vrc_armature)
     kk_bones = get_bone_map(kk_armature)
     root_names = {bone.name for bone in vrc_armature.data.bones if is_candidate_root(bone, children_map)}
@@ -275,6 +218,7 @@ def scan_candidates(vrc_armature, kk_armature, attachment_mode="WAIST"):
         if parent_is_inside_candidate(parent_name, root_names - {bone_name}, children_map):
             continue
         priority, target_name, reason = classify_candidate(bone_name, parent_name, attachment_mode)
+        target_name = bone_names.resolve(target_name,kk_bones,default=target_name)
         chain = collect_chain_names(children_map, bone_name)
         roots.append(
             {
@@ -283,7 +227,7 @@ def scan_candidates(vrc_armature, kk_armature, attachment_mode="WAIST"):
                 "priority": priority,
                 "target": target_name,
                 "target_exists": target_name in kk_bones if target_name else False,
-                "already_exists": any(name in kk_bones for name in chain),
+                "already_exists": any(bone_names.resolve(name,kk_bones) is not None for name in chain),
                 "chain_count": len(chain),
                 "reason": reason,
                 "chain": chain,

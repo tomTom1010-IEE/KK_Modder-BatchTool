@@ -1,3 +1,4 @@
+from . import bone_names
 import bpy
 
 from . import common
@@ -51,6 +52,7 @@ def remap_breast_weights(
     smooth_strength,
     smooth_expand_rings,
 ):
+    mapping = bone_names.remap_table(mapping,obj.vertex_groups.keys(),kk_bone_names)
     missing_targets = []
     missing_sources = []
     source_groups = {}
@@ -136,11 +138,13 @@ def mix_breast_weights(
     smooth_strength,
     smooth_expand_rings,
 ):
+    mapping = bone_names.remap_table(mapping,obj.vertex_groups.keys(),kk_bone_names)
     source_names = set(BREAST_SOURCE_GROUPS)
     if not include_root:
         source_names.discard("Breast_root.L")
         source_names.discard("Breast_root.R")
 
+    source_names = {bone_names.resolve(n,obj.vertex_groups,default=n) for n in source_names}
     source_groups = {}
     missing_sources = []
     missing_targets = []
@@ -154,7 +158,8 @@ def mix_breast_weights(
             if target_name not in kk_bone_names:
                 missing_targets.append(f"{source_name} -> {target_name}")
 
-    body_group_names = {name for name in DEFAULT_BODY_GROUPS if name in obj.vertex_groups and name in kk_bone_names}
+    body_group_names = {bone_names.resolve(name,kk_bone_names) for name in DEFAULT_BODY_GROUPS}
+    body_group_names = {name for name in body_group_names if name and name in obj.vertex_groups}
     affected_vertices = set()
     touched_group_names = set(body_group_names)
 

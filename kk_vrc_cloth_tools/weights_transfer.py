@@ -1,3 +1,4 @@
+from . import bone_names
 import bpy
 from mathutils.bvhtree import BVHTree
 from mathutils.kdtree import KDTree
@@ -217,6 +218,8 @@ def scale_body_weights_to_capacity(weights, capacity):
 
 
 def transfer_source_body_weights_to_target(source_body, target, body_group_names):
+    bone_names.assert_unique(source_body.vertex_groups.keys())
+    bone_names.assert_unique(target.vertex_groups.keys())
     body_group_names = sorted(body_group_names)
     if not body_group_names:
         return [{} for _vertex in target.data.vertices]
@@ -290,7 +293,7 @@ def collect_source_vertex_weights(source_body, kk_bone_names):
     group_names_by_index = {
         group.index: group.name
         for group in source_body.vertex_groups
-        if group.name in kk_bone_names and bone_rules.is_kk_standard_body_bone(group.name)
+        if group.name in kk_bone_names and bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', group.name)
     }
     weights = []
     for vertex in source_body.data.vertices:
@@ -308,13 +311,13 @@ def collect_source_body_group_names(source_body, kk_bone_names):
         group.name
         for group in source_body.vertex_groups
         if group.name in kk_bone_names
-        and bone_rules.is_kk_standard_body_bone(group.name)
+        and bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', group.name)
         and common.group_has_weights(source_body, group.index)
     }
 
 
 def is_replaceable_non_kk_group(group_name, treat_vrc_humanoid_as_body):
-    if treat_vrc_humanoid_as_body and group_name in VRC_HUMANOID_GROUPS:
+    if treat_vrc_humanoid_as_body and bone_names.key(group_name,VRC_HUMANOID_GROUPS) is not None:
         return True
     return False
 
@@ -634,7 +637,7 @@ def swap_lr_vertex_group_weights(target, do_apply, remove_empty_groups_after):
 
 
 def is_bnip_group_name(name):
-    return bone_rules.is_nipple_detail_bone(name)
+    return bone_names.rule_test(bone_rules, 'is_nipple_detail_bone', name)
 
 
 def choose_bnip_fallback_group(target, side):
@@ -644,7 +647,7 @@ def choose_bnip_fallback_group(target, side):
     candidates += [name for name in BNIP_FALLBACK_GROUPS if name not in candidates]
 
     for name in candidates:
-        group = target.vertex_groups.get(name)
+        group = target.vertex_groups.get(bone_names.resolve(name,target.vertex_groups,default=name))
         if group is not None:
             return group
 
@@ -652,9 +655,9 @@ def choose_bnip_fallback_group(target, side):
 
 
 def get_bnip_side(group_name):
-    if group_name.endswith("_L"):
+    if group_name.endswith(("_L", ".L")):
         return "L"
-    if group_name.endswith("_R"):
+    if group_name.endswith(("_R", ".R")):
         return "R"
     return ""
 

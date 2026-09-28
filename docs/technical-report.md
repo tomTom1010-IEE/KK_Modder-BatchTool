@@ -1,12 +1,14 @@
 # Garment Skinning Transfer with Semantic Influence Budgets
 
-**KK Modder BatchTool — Technical Report**  
-Implementation snapshot: **0.2.17** · September 20, 2026  
+**KK Modder BatchTool — Technical Report**
+
+Implementation update: **0.3.0** · September 28, 2026
+
 Project: [tomTom1010-IEE/KK_Modder-BatchTool](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool)
 
 [Paper: SBCST (PDF)](paper/SBCST.pdf) · [Project page](../README.md) · [User manual](../USER_GUIDE.md)
 
-**September 21 extension:** the [VRC/MMD performance showcase](performance-showcase.md) adds the later constraint-aware MMD skirt-outfit experiment and its collision-review qualifications. The implementation discussion below retains its September 20 snapshot; references to untested skirts describe that earlier snapshot.
+The core formulation and Section 6 measurements retain the September 20 dense-method evidence. The [VRC/MMD showcase](performance-showcase.md) adds the September 21 applicability experiment. **Section 7 is a separate deployment extension** for total influence counts, with a September 28 controlled dry run. Historical results are not relabeled as four-influence measurements.
 
 *A short implementation report, not a peer-reviewed publication. The notation and section structure follow conventional graphics papers; the method is distinct from SSDR.*
 
@@ -194,21 +196,79 @@ The shoe pair contains 24,082 vertices. Each side had 153 vertices beyond the sa
 
 Provenance: `close-no-bnip/stage1/validation.json`, `close-no-bnip/stage2/validation.json`, and `shoe-transfer/flat-round-02/{report.json,actual-writeback-audit.json}` in the local test archive. The repository includes an [extracted measurement summary](data/case-study-summary.json), not the third-party asset files or full private scene archive. The [shoe example configuration](../examples/flat_shoe_neon_vertex.json) now enables the later random preset; exact historical reproduction requires the archived configuration, including its original world axes and disabled auxiliary sampling. Automatic direction inference in the newer UI can change those axes. Public summary numbers alone are not a reproducible asset benchmark.
 
-## 7. Limitations and future work
+## 7. Deployment extension: total influence constraints
+
+### 7.1 Scope and compatibility
+
+The core SBCST budgets constrain **amounts of influence**, not the number of positive bone weights. An optional deployment policy intersects that feasible set with a total-support cap. The first implementation supports `max_influences: 4`, or `0` for unlimited. Body bones, retained dynamics, and enabled fingers share the same four slots; an ancestor consumes no slot unless it has a positive weight. Counts include every positive final weight, including a float32 representation audit, without hidden threshold pruning.
+
+New UI configurations default to four. Saved legacy configurations and API/JSON contexts without a policy remain unlimited. Dynamic compression defaults to false in both. The policy is part of configuration/context signatures; changing it requires re-preparation. The garment beginner panel, garment Stage 3, and shoe panel expose the same controls. [Current UI instructions](../USER_GUIDE.md#choose-a-total-influence-policy).
+
+### 7.2 Feasibility before fitting
+
+Let $\mathcal P_i^+$ be the positive fixed contributions, including enabled fingers, and let $\beta_{ir}$ be the category budget remaining after all fixed contributions are subtracted. A necessary slot count is
+
+$$
+\ell_i=|\mathcal P_i^+|+\sum_r\mathbf{1}[\beta_{ir}>0].
+$$
+
+Distinct positive residual categories require distinct free recipients. An arm category completely covered by a fixed finger needs no extra body slot. Even a tiny positive category cannot be dropped. If $\ell_i>4$, exact fixed contributions and category conservation cannot both fit four slots. Conversely, $\ell_i\leq4$ is not sufficient: admission, local bounds, or contacts can still make a support infeasible.
+
+With binary support indicators $z_{ij}$, the joint problem adds
+
+$$
+0\leq w_{ij}\leq z_{ij},\qquad z_{ij}\in\{0,1\},\qquad\sum_jz_{ij}\leq4
+$$
+
+to the original constraints. This makes the full problem combinatorial even though a fixed-support response/contact subproblem is convex. The implementation does not run a global mixed-integer optimizer.
+
+### 7.3 Bounded support search and continuous refinement
+
+Initialization retains the dense distribution as a reference and prepares a feasible sparse copy where possible. The outer search removes candidate body bones and tests bounded one-bone exchanges, at most 64 exchange evaluations per vertex. Each candidate respects residual category sums and local correction bounds. Macro/terminal search uses **training** response evidence and an initialization prior; it does not rank supports with holdouts. The ranking is local and omits the full coupled graph/contact objective.
+
+The inner OSQP solve freezes that support and jointly fits weights with the original graph and contact constraints. Dense anchor, sparse feasible seed, and bound origin are distinct: removed influences contribute constants to the graph correction energy, and local bounds remain relative to the actual stage input. If the chosen support fails continuous/contact solving, the candidate is rejected; automatic contact-driven support retries are not implemented. This is a heuristic discrete/continuous architecture, not a certificate of global sparse optimality.
+
+Infeasible rows remain unchanged and are reported while feasible rows can proceed. Whole-mesh counting includes pure dynamics and protected exterior vertices. `STRICT_FOUR` requires every row to satisfy the cap; `RUNTIME_REVIEW_REQUIRED` explicitly permits reported unchanged over-limit rows and is not a strict-cap result. A successful solver status or collision-review waiver cannot convert one into the other.
+
+Terminal refinement retains selected-core/transition bounds and an immutable exterior; UI-generated contexts also recheck macro holdouts. In the shoe branch, support is counted on final weights $w_{ij}=b_ip_{ij}$ plus dynamics. A selects support and reruns graph continuity within it; B keeps the same mask throughout projection. The cap does not replace the shoe spatial objective with the garment response objective.
+
+### 7.4 Optional dynamic approximation
+
+Approximation is **off by default** and only addresses fixed-slot conflicts. It preserves each vertex's dynamic total and all fixed finger contributions, but may redistribute individual dynamic weights within a subset of their original positive support. The implementation tests at most 64 subsets, retaining relative proportions within each subset and rescaling to the original dynamic total. It cannot invent a dynamic recipient or consume a body category.
+
+Independent target-rig probes rotate each retained dynamic bone about local X/Y/Z: +12 degrees for ranking and −7 degrees for validation. Blender samples descendant transforms and verifies LBS; a dynamic subtree containing body-weighted descendants is rejected. Maximum original-versus-compressed displacement, normalized by garment span, must not exceed the configured tolerance (default 0.002), and separate scoped contact checks must pass. These probes do not model inertia, damping, or all runtime trajectories. Garments reject failed compressed candidates; shoes can restore failed rows to unchanged exceptions. This differs from an engine's unchecked global top-four truncation.
+
+### 7.5 Controlled dry run
+
+Two archived jackets compare the old solver, the new unlimited path, and four-influence fitting, with compression disabled. The same-input macro comparison uses identical dense inputs, poses, candidates, parameters, and contact samples. Three serial runs use rotated mode order; reported times are medians. Full details and hashes are in the [protocol](influence-limit-benchmark.md) and [public extract](data/influence-limit-benchmark.json).
+
+| Case | Legacy macro | New unlimited | Four macro | Four overhead |
+|---|---:|---:|---:|---:|
+| Closed jacket, 8,885 vertices | 26.53 s | 26.96 s | 47.60 s | +79.45% |
+| Open jacket, 8,969 vertices | 25.41 s | 25.48 s | 51.31 s | +101.92% |
+
+Unlimited final weights equal the legacy weights exactly, including the chained terminal stage. Four-mode support search takes median 19.91 and 25.06 seconds. Timings exclude transfer, shared reference preparation, scene sampling, I/O, and independent validation; they do not measure Unity frame rates.
+
+A separate complete numeric path includes initialization support selection, the retained dense prior, and macro-to-terminal chaining. Single-run totals are 53.45/64.65 seconds versus 37.39/36.87 seconds for legacy macro-plus-terminal. Its independent macro RMS improves 0.56%/1.75%, but maximum macro error rises 0.48%/1.53%. Closed terminal RMS improves 67.05%; open terminal RMS increases **8.68%**, P95 increases 11.48%, and maximum error is essentially unchanged. A smaller support therefore has an asset- and scope-dependent fidelity cost.
+
+All fixed/dynamic changes are zero and maximum six-budget error is $3.99\times10^{-8}$. The closed result is four-compatible throughout; the open result preserves **140 over-limit rows**, with maximum support nine. Each final result has zero detected body-influenced crossings or penetrating samples over three macro and four terminal holdouts, using tolerance $10^{-4}$ and no extra body-vertex exemption mask. This dry run does not write a Blender result, test engine import, or certify pure-dynamic/runtime contacts. Optional compression and shoe/MMD cap accuracy require separate empirical studies.
+
+## 8. Limitations and future work
 
 The garment branch assumes paired original/fitted garment vertices and fixed, verifiable skinning transforms. Active shape keys, unsupported constraints/drivers, SDEF, envelopes, and dual-quaternion/preserve-volume behavior require separate adapters. More body segments can improve the available distribution, but do not remove semantic ambiguity or pose-retargeting uncertainty.
 
-Discrete poses cannot certify continuous-time collision avoidance. Pure dynamic regions are excluded from body-weight fitting; secondary-motion inertia, damping, runtime collisions, self-collisions, and other clothing layers are not reconstructed by this optimizer. Fixed dynamic contributions can make a contact infeasible. Weight cleanup that enforces a later bone-count cap would require revalidation; the current method does not promise SSDR-style sparsity.
+Discrete poses cannot certify continuous-time collision avoidance. Pure dynamic regions are excluded from body-weight fitting; secondary-motion inertia, damping, runtime collisions, self-collisions, and other clothing layers are not reconstructed by this optimizer. Fixed contributions can make contact or support constraints infeasible. Section 7's bounded support search is an optional deployment extension, not SSDR-style skeleton decomposition or a global sparse optimum. Later engine pruning still requires revalidation.
 
-Stable-plus-gradient protected components, high-heel pose transfer, explicit links between disconnected layers, and skirt-specific evaluation remain future work. The random shoe preset is implemented and tested for reproducibility and bounds, but no accuracy gain from it is established by the reported case studies. There is no controlled baseline study, runtime scaling experiment, or claim of state-of-the-art performance.
+Stable-plus-gradient protected components, high-heel pose transfer, explicit links between disconnected layers, and broader skirt-specific evaluation remain future work. The random shoe preset is implemented and tested for reproducibility and bounds, but no accuracy gain from it is established by the reported case studies. The later native-transfer comparisons and Section 7's controlled cap ablation do not constitute a cross-method state-of-the-art or runtime scaling study.
 
-## 8. Code correspondence
+## 9. Code correspondence
 
 | Component | Implementation |
 |---|---|
 | Budget/finger planning and Blender writeback | [weight_features.py](../kk_vrc_cloth_tools/weight_features.py), [weights_features.py](../kk_vrc_cloth_tools/weights_features.py) |
 | Roles and root-region review | [vrc_bone_rules.py](../kk_vrc_cloth_tools/vrc_bone_rules.py), [workflow_regions.py](../kk_vrc_cloth_tools/workflow_regions.py), [region_patterns.py](../kk_vrc_cloth_tools/region_patterns.py) |
 | Rest transport and garment QP | [weight_optimizer.py](../kk_vrc_cloth_tools/weight_optimizer.py), [weights_optimization.py](../kk_vrc_cloth_tools/weights_optimization.py) |
+| Total support, optional dynamic approximation, UI/migration | [influence_policy.py](../kk_vrc_cloth_tools/influence_policy.py), [influence_blender.py](../kk_vrc_cloth_tools/influence_blender.py) |
 | Independent garment validation | [optimizer_validation.py](../kk_vrc_cloth_tools/optimizer_validation.py), [optimizer_scope.py](../kk_vrc_cloth_tools/optimizer_scope.py) |
 | Shoe graph and gap fitting | [shoe_field.py](../kk_vrc_cloth_tools/shoe_field.py), [shoe_workflow.py](../kk_vrc_cloth_tools/shoe_workflow.py) |
 | Shoe preset and current UI | [shoe_presets.py](../kk_vrc_cloth_tools/shoe_presets.py), [shoe_ui.py](../kk_vrc_cloth_tools/shoe_ui.py) |

@@ -78,6 +78,14 @@ def validate(arrays,metadata,candidate,report,tolerance=1e-4):
     source_lbs_error=check_source_deformation(arrays)
     if metadata['context_id']!=report['context_id']:raise ValueError('Wrong report context')
     weights=np.asarray(candidate['weights'])
+    from .influence_policy import validate_result,policy
+    allowed=arrays.get('candidates')
+    if allowed is None:
+        if policy(metadata.get('influence_policy'))['max_influences']:raise ValueError('Limited context requires explicit candidate admission')
+        allowed=np.ones_like(arrays['fixed'],bool)  # Legacy validation-only archives.
+    support=validate_result(arrays['initial'],weights,arrays['regions'],arrays['budgets'],arrays['fixed'],allowed,metadata.get('influence_policy'),
+        selected=arrays['selected'],delta_limits=arrays.get('delta_limits'),rest=arrays['target_rest'],
+        dynamic_holdout=arrays.get('dynamic_holdout'),dynamic_scale=metadata.get('dynamic_scale',1.))
     if report['candidate_digest']!=core.digest(weights.tolist()):raise ValueError('Candidate weights changed')
     # Recompute positions: do not trust candidate-provided positions or metrics.
     def skin(w):
@@ -90,6 +98,8 @@ def validate(arrays,metadata,candidate,report,tolerance=1e-4):
     if not np.allclose(positions,candidate['positions'],atol=1e-7):raise ValueError('Candidate positions changed')
     excluded=pure_dynamic_vertices(arrays['budgets'])
     contact_excluded=excluded.copy()
+    compressed=np.asarray(support['dynamic_changed_vertices'],int)
+    contact_excluded[compressed]=False
     outside=~np.isin(np.arange(len(weights)),arrays['selected'])
     if metadata.get('local_refinement'):contact_excluded |= outside
     exterior_geometry_unchanged=bool(np.max(abs(positions[:,outside]-baseline[:,outside]),initial=0)<1e-8)
@@ -108,19 +118,52 @@ def validate(arrays,metadata,candidate,report,tolerance=1e-4):
     if metadata.get('local_refinement'):motion_scope &= np.isin(np.arange(len(excluded)),arrays['selected'])
     old=np.linalg.norm((baseline[holdout]-ref[holdout])[:,motion_scope],axis=2);new=np.linalg.norm((positions[holdout]-ref[holdout])[:,motion_scope],axis=2)
     motion_ok=bool(np.mean(new*new)<=np.mean(old*old)+1e-12 and new.max()<=old.max()+tolerance)
-    fixed_ok=bool(np.max(abs(weights[arrays['fixed']]-arrays['initial'][arrays['fixed']]),initial=0)<1e-8)
+    fixed_ok=support['fixed_ok'] and support['dynamic_response_ok']
     local_ok=bool(np.array_equal(weights[outside],arrays['initial'][outside]))
     if 'delta_limits' in arrays:local_ok &= bool(np.all(abs(weights-arrays['initial'])<=arrays['delta_limits'][:,None]+1e-7))
     budget_error=max(float(np.max(abs(weights[:,arrays['regions']==r].sum(axis=1)-arrays['budgets'][:,r]))) for r in range(6))
-    dynamic_unchanged=bool(np.max(abs(positions[:,excluded]-baseline[:,excluded]),initial=0)<1e-8)
+    unchanged_scope=excluded.copy();unchanged_scope[compressed]=False
+    dynamic_unchanged=bool(np.max(abs(positions[:,unchanged_scope]-baseline[:,unchanged_scope]),initial=0)<1e-8)
+    dynamic_contact_ok=True;dynamic_contacts=[]
+    if len(compressed):
+        probe_excluded=np.ones(len(weights),bool);probe_excluded[compressed]=False
+        for i,mat in enumerate(arrays.get('dynamic_holdout',[])):
+            basis=np.einsum('bij,vj->vbi',mat[:,:3,:3],arrays['target_rest'])+mat[None,:,:3,3]
+            pos=np.einsum('vb,vbc->vc',weights,basis)
+            col=check_surface(pos,arrays['triangles'],arrays['body_poses'][0],arrays['body_triangles'],tolerance,probe_excluded)['in_scope']
+            dynamic_contacts.append(dict(pose=i,**col))
+            dynamic_contact_ok &= all(col[k]==0 for k in ('intersecting_triangle_pairs','penetrating_samples','ambiguous_coplanar_pairs'))
+        dynamic_contact_ok &= bool(dynamic_contacts)
+    regression=None;regression_ok=True
+    if 'regression_matrices' in arrays:
+        old_positions=[];new_positions=[];regression_contacts=[]
+        for i,mat in enumerate(arrays['regression_matrices']):
+            basis=np.einsum('bij,vj->vbi',mat[:,:3,:3],arrays['target_rest'])+mat[None,:,:3,3]
+            old_pos=np.einsum('vb,vbc->vc',arrays['initial'],basis)
+            new_pos=np.einsum('vb,vbc->vc',weights,basis)
+            old_positions.append(old_pos);new_positions.append(new_pos)
+            before_col=check_surface(old_pos,arrays['triangles'],arrays['regression_body_poses'][i],arrays['body_triangles'],tolerance,contact_excluded)['in_scope']
+            after_col=check_surface(new_pos,arrays['triangles'],arrays['regression_body_poses'][i],arrays['body_triangles'],tolerance,contact_excluded)['in_scope']
+            regression_contacts.append({'before':before_col,'after':after_col})
+            regression_ok &= (not (set(map(tuple,after_col['triangle_pairs']))-set(map(tuple,before_col['triangle_pairs'])))
+                              and after_col['penetrating_samples']<=before_col['penetrating_samples']
+                              and after_col['max_oriented_depth']<=before_col['max_oriented_depth']+tolerance)
+        old_e=np.linalg.norm((np.array(old_positions)-arrays['regression_reference'])[:,motion_scope],axis=2)
+        new_e=np.linalg.norm((np.array(new_positions)-arrays['regression_reference'])[:,motion_scope],axis=2)
+        regression_ok &= bool(np.mean(new_e**2)<=np.mean(old_e**2)+1e-12 and new_e.max()<=old_e.max()+tolerance)
+        regression=dict(before_rms=float(np.sqrt(np.mean(old_e**2))),after_rms=float(np.sqrt(np.mean(new_e**2))),
+                        accepted=bool(regression_ok),contacts=regression_contacts)
     # Revalidate earlier candidates without rewriting their original solve reports.
     conflicts=report.get('fixed_contact_conflicts',[])
     legacy_excluded=(report['status']=='fixed_contact_conflict' and bool(conflicts)
         and bool(report.get('history')) and all(h['status']=='solved' for h in report['history'])
         and all(np.all(excluded[np.asarray(c['vertices'],int)[np.asarray(c['barycentric'])>0]]) for c in conflicts))
-    non_contact_ok=(report['status']=='solved' or legacy_excluded) and motion_ok and fixed_ok and dynamic_unchanged and local_ok and exterior_geometry_unchanged and budget_error<1e-6
+    non_contact_ok=(report['status']=='solved' or legacy_excluded) and motion_ok and fixed_ok and dynamic_unchanged and local_ok and exterior_geometry_unchanged and budget_error<1e-6 and support['constraints_ok'] and dynamic_contact_ok and regression_ok
     accepted=non_contact_ok and contact_ok
     return {'schema':2,'context_id':metadata['context_id'],'candidate_digest':core.digest(weights.tolist()),
+        'influence_support':support,'strict_four_compatible':support['strict_compatible'],
+        'dynamic_contact_ok':bool(dynamic_contact_ok),'dynamic_contacts':dynamic_contacts,
+        'macro_regression':regression,
         'accepted':accepted,'non_contact_ok':bool(non_contact_ok),'contact_ok':contact_ok,'holdout_motion_ok':motion_ok,'fixed_ok':fixed_ok,
         'collision_review_vertices':sorted({i for p in per_pose for i in p['after']['in_scope']['problem_vertices']}),
         'collision_changes':[{'pose':p['name'],

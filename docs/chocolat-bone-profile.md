@@ -87,6 +87,29 @@ because the importer set `use_deform=True`.
 
 ## Integration and remaining boundaries
 
+As of 2026-09-28, source names are assigned shared anatomical slots by
+`VRC_BODY_SEMANTICS` in `vrc_bone_rules.py`. `vrc_kk_mapping.py` maps those slots
+to one common set of KK defaults. Spaced Shinano fingers and compact Chocolat
+fingers, and the corresponding limb aliases, share the same target entries.
+There is no separate Chocolat transfer algorithm. `VRC_MOTION_SEMANTICS` keeps
+its existing macro-preset slots; adding mapping semantics does not add new
+motion controls or budgets.
+
+The six-budget scan, legacy body-weight mapping, beginner finger setup and
+graft limb attachments consume this shared mapping. The legacy body-remap
+operator retains its non-torso scope. Breast-root **attachment** defaults are
+also derived from the source breast-chain tags and shared with Shinano, while
+breast **weight/motion** mapping remains explicitly configured for both.
+All previously mapped source names retain their previous target names.
+
+Fixture-based Blender checks cover automatic mapping and configuration of all
+non-breast weighted body bones in both Chocolat variants (51 and 39 groups).
+The four remaining weighted breast groups in each variant retain the same
+manual mapping boundary as Shinano. Full-scene source topology, target positive
+weight admission and motion/collision acceptance are still separate checks.
+The existing six-budget, optimization and four-influence layers are reused
+without changing their numerical behavior.
+
 The six-budget and shoe scanners consume `VRC_WEIGHT_POLICIES` generated from
 these records. Graft exclusion now consumes the common `TAG_VRC_GRAFT_STOP`
 set, including compact fingers and body endpoints; its historical variable
@@ -100,9 +123,12 @@ have positive weights on the target body.
 
 The earlier user screenshot uses `Breast_R_001`, `LowerArm_L` and other
 underscore spellings. These exact spellings are absent from both current
-imports. They are not silently normalized: confirm their actual hierarchy and
-binding before adding an explicit alias profile. A screenshot alone does not
-establish that every punctuation substitution preserves bone identity.
+imports. The shared [bone-name compatibility layer](bone-name-compatibility.md)
+now accepts the controlled final-suffix variants against these canonical rules,
+without adding duplicate avatar entries or renaming the scene. This does not
+establish the cause of the importer's spelling change, validate a different
+hierarchy, or authorize arbitrary punctuation substitutions. Exact binding
+between mesh groups and scene bones remains required.
 
 The source repository and Blender's installed add-on are separate copies.
 Updating these files does not hot-reload the running add-on.

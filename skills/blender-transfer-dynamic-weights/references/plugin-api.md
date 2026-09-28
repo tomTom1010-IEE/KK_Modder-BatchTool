@@ -1,5 +1,7 @@
 # 插件调用参考
 
+插件 0.3 起，总影响数政策与受限初始化的 API 见 [总影响数约束](influence-limits.md)。下方旧接口示例未传政策时保留不限行为；面向新四影响任务优先使用该参考中的 UI 后端调用。
+
 先定位用户的 `KK_Modder-BatchTool` 主仓库，将其绝对路径记为 `verified_repo_path`；说明文件是仓库根目录的 `WEIGHT_FEATURES_CN.md`。
 不可把 `cache/repository-snapshots` 当主仓库。其他机器先定位仓库，不强制沿用路径。
 测试产物按项目目录约定放入对应测试项目，通用技能/分析在 `garment-workflow`。

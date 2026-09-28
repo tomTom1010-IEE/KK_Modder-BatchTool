@@ -6,6 +6,7 @@ Apply validates stale state and rolls weights back on failure; it never saves fi
 import bpy
 from . import weight_features as core
 from . import vrc_bone_rules
+from . import bone_names
 
 
 def read_weights(obj):
@@ -30,6 +31,8 @@ def body_weight_support(body_source, target):
     if body_rigs and body_rigs != rigs:
         raise ValueError('Body and garment must use the same target rig')
     bones = {b.name for b in rigs[0].data.bones if b.use_deform}
+    bone_names.assert_unique(rigs[0].data.bones.keys())
+    bone_names.assert_unique(body_source.vertex_groups.keys())
     return {n for row in read_weights(body_source) for n,w in row.items() if w > 0 and n in bones}
 
 
@@ -97,7 +100,8 @@ def capture_snapshot(obj, roles):
     for rig in rigs:
         bones = {b.name: {'parent': b.parent.name if b.parent else None,
                          'use_deform': b.use_deform} for b in rig.data.bones}
-        audit = vrc_bone_rules.audit_vrc_weight_roles(rows, bones, roles)
+        audit = bone_names.audit_roles(vrc_bone_rules.audit_vrc_weight_roles, rows, bones, roles,
+                                      vrc_bone_rules.VRC_STANDARD_BODY_BONES)
         if audit['discarded_deform_bones']:
             raise ValueError('Weighted source body bones cannot be discarded: ' + str(audit['discarded_deform_bones']))
     return core.snapshot(rows, [list(e.vertices) for e in obj.data.edges], roles, topology(obj))
@@ -174,6 +178,18 @@ def apply_plan(target, proposal):
     if any(g.lock_weight for g in target.vertex_groups if g.name in managed):
         raise ValueError('Managed group is locked; choose an explicit preservation policy')
     before = read_weights(target)
+    from .influence_policy import audit as influence_audit,policy as influence_policy
+    def audit_rows(rows):
+        # Include every bound deform group, even on immutable/pure-dynamic vertices.
+        names=sorted({n for row in rows for n in row if n in bones})
+        return influence_audit([[row.get(n,0.) for n in names] for row in rows],proposal.get('influence_policy'))
+    support_expected=None
+    if influence_policy(proposal.get('influence_policy'))['max_influences']:
+        expected=[writes.get(i,row) for i,row in enumerate(before)]
+        support_expected=audit_rows(expected)
+        declared=set(proposal.get('influence_support',{}).get('over_limit_vertices',[]))
+        if set(support_expected['over_limit_vertices'])!=declared:
+            raise ValueError('Undeclared full-mesh influence limit exceptions')
     # Unreviewed target influences must not silently change the effective budget.
     ignored = set(g.name for g in target.vertex_groups) - managed
     if any(g in bones and w > 0 for i in writes for g, w in before[i].items() if g in ignored):
@@ -192,6 +208,9 @@ def apply_plan(target, proposal):
     try:
         write_rows(writes)
         after = read_weights(target)
+        support_actual=audit_rows(after)
+        if support_expected is not None and set(support_actual['over_limit_vertices'])-set(support_expected['over_limit_vertices']):
+            raise RuntimeError('Float32 writeback introduced an influence-limit violation')
         errors = []
         for i, weights in writes.items():
             if 'region_budgets' in proposal:
@@ -214,6 +233,7 @@ def apply_plan(target, proposal):
                 target.vertex_groups.remove(group)
         raise
     return {'changed_vertices': len(writes), 'snapshot_id': proposal['snapshot_id'],
+            'influence_support':support_actual,
             'features': proposal['summary'], 'skipped': proposal['skipped'], 'verified': True}
 
 

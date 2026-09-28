@@ -8,11 +8,14 @@ import numpy as np
 from . import weights_features as wf, weight_features as core
 from . import weights_optimization as optimization, optimizer_validation
 from . import vrc_bone_rules as vr, bone_rules, weights_body
+from .vrc_kk_mapping import VRC_TO_KK_BODY_TARGETS
 from .workflow_regions import resolve_regions
 from .workflow_presets import discover_roots, motion_templates
 from .region_patterns import suggest_pattern
 from .optimizer_profiles import TERMINAL
 from . import mmd_weight_profiles
+from . import influence_blender
+from . import bone_names as names, bone_names_ui
 from mathutils import Vector, Matrix
 
 REGIONS=[(x,x,'') for x in ('TORSO','ARM_L','ARM_R','LEG_L','LEG_R')]
@@ -85,6 +88,7 @@ class KKVRC_WFMotion(bpy.types.PropertyGroup):
     extra_angle:bpy.props.FloatProperty(name='Additional training angle (0 disables)',default=0,min=0,max=120)
 
 class KKVRC_WorkflowProperties(bpy.types.PropertyGroup):
+    __annotations__=influence_blender.properties()
     source_profile:bpy.props.EnumProperty(name='Source rig profile',items=[('VRC','VRC','Existing VRC profile'),('MMD','Generic MMD','Use the maintained MMD convention profile'),('MMD_LIV','MMD · R4 Liv','Generic profile and existing R4 Liv research')],default='VRC')
     mmd_profile_path:bpy.props.StringProperty(name='MMD model profile (optional)',subtype='FILE_PATH')
     profile_digest:bpy.props.StringProperty()
@@ -161,6 +165,8 @@ def rig(obj):
 
 def inputs(p):
     sr,tr,br=rig(p.source),rig(p.target),rig(p.body)
+    for arm in (sr,tr):names.assert_unique(arm.data.bones.keys())
+    for obj in (p.source,p.target,p.body):names.assert_unique(obj.vertex_groups.keys())
     if len({p.source,p.target,p.body})!=3 or sr==tr or tr!=br:
         raise ValueError('Source garment requires a separate rig; target body and fitted garment must share the target rig')
     if p.source.mode!='OBJECT' or p.target.mode!='OBJECT' or p.body.mode!='OBJECT':raise ValueError('Leave Edit/Weight Paint Mode on input meshes before solving')
@@ -175,7 +181,7 @@ def finger_name(name):
     return 'NONE'
 
 def target_region(name):
-    rule=bone_rules.KK_STANDARD_BODY_BONES.get(name)
+    rule=names.lookup(bone_rules.KK_STANDARD_BODY_BONES,name)
     if not rule:return None
     tags=rule.regions
     if tags & {bone_rules.REGION_ARM,bone_rules.REGION_HAND}:return 'ARM_'+rule.side if rule.side else None
@@ -194,6 +200,8 @@ def dump_settings(p):
     out.update(schema=1,source=p.source.name if p.source else None,target=p.target.name if p.target else None,body=p.body.name if p.body else None,
                confidence=p.confidence,initial_mode=p.initial_mode,local_vertices=p.local_vertices,local_topology=p.local_topology,rings=p.rings,small_angle=p.small_angle,contacts=p.contacts)
     for key in ['source_profile','mmd_profile_path','profile_digest','source_sampling','reference_mode','collision_policy','exclude_bnip']:out[key]=getattr(p,key)
+    out['influence_policy']=influence_blender.settings(p)
+    out['bone_name_mode']=names.mode()
     return out
 
 def fingerprint(p,full=False):
@@ -252,7 +260,7 @@ def config(p):
         if vertices is not None and r.topology!=wf.topology(p.source):raise ValueError(r.name+': vertex selection is stale; capture again')
         regions.append({'name':r.name,'mode':r.mode,'bones':bones,'vertices':vertices})
     modes=resolve_regions(rows,roles,regions)
-    replacements={n:{'cf_s_bust03_'+n[-1]:1.} for n in support if p.exclude_bnip and 'bnip' in n}
+    replacements={n:{names.resolve('cf_s_bust03_'+n[-1],support,default='cf_s_bust03_'+n[-1]):1.} for n in support if p.exclude_bnip and 'bnip' in n}
     if any(set(mapping)-support for mapping in replacements.values()):raise ValueError('Missing same-side weighted bust compensation bone')
     if any(n in replacements for mapping in bodymap.values() for n in mapping):raise ValueError('Body mapping still targets excluded bnip bones; use same-side bust bones')
     return dict(roles=roles,source_regions=source_regions,target_regions=target_regions,
@@ -260,9 +268,10 @@ def config(p):
                 finger_policy={'source_fingers':sf,'target_fingers':tf,'enabled':sorted(enabled),'disabled_map':disabled},region_modes=modes,sampling_replacements=replacements)
 
 def scan(p):
+    influence_blender.settings(p)
     sr,tr=inputs(p)
     if len(p.bones) or len(p.targets):raise ValueError('Configuration already exists; export or clear it first to preserve manual decisions')
-    mapping=dict(weights_body.VRC_TO_KK_BODY_GROUPS,Spine='cf_j_spine01',Chest='cf_j_spine03',Hips='cf_j_hips')
+    mapping=VRC_TO_KK_BODY_TARGETS
     support=wf.body_weight_support(p.body,p.target)
     mmd={}
     if p.source_profile!='VRC':
@@ -274,7 +283,7 @@ def scan(p):
         if reg:x.region=reg;x.reviewed=True
         x.finger=finger_name(n)
     for n in sorted({n for row in wf.read_weights(p.source) for n in row}):
-        x=p.bones.add();x.name=n;policy=vr.VRC_WEIGHT_POLICIES.get(n) if p.source_profile=='VRC' else None
+        x=p.bones.add();x.name=n;policy=names.lookup(vr.VRC_WEIGHT_POLICIES,n) if p.source_profile=='VRC' else None
         if p.source_profile!='VRC':
             info=mmd.get(n,{})
             x.recognition=json.dumps(info,ensure_ascii=False)
@@ -283,23 +292,25 @@ def scan(p):
                 x.role='BODY';x.region=info['budget_region'];semantic=info.get('reference_semantic')
                 # Reuse the established semantic->KK map; do not duplicate MMD bone names in code.
                 vrc=next((v for v,s in vr.VRC_MOTION_SEMANTICS.items() if s==semantic and v in mapping),None)
-                motion=mapping.get(vrc,'');x.pose_target=motion
+                motion=mapping.get(vrc,'');x.pose_target=names.resolve(motion,tr.data.bones,default='')
                 candidates=[motion,motion.replace('cf_j_','cf_s_')]
                 for a,b in [('hips','waist02'),('shoulder','shoulder02'),('arm00','arm01'),('thigh00','thigh01')]:candidates.append(motion.replace('cf_j_'+a,'cf_s_'+b))
-                x.weight_target=next((v for v in candidates if v in support),'')
+                x.weight_target=names.first(candidates,support)
                 if info.get('kind')=='FINGER':
                     x.finger=info['finger'].upper()+'_'+info['side'];x.semantic='NONE'
                 elif info.get('kind')=='BODY' and semantic in {s[0] for s in SEMANTICS}:x.semantic=semantic
             continue
         if policy and policy.source_role=='BODY' and policy.budget_region:
-            x.role='BODY';x.region=policy.budget_region;x.anchor=policy.reference_anchor if policy.reference_anchor!=n else ''
-            motion=mapping.get(policy.reference_anchor,'');x.pose_target=motion
+            x.role='BODY';x.region=policy.budget_region
+            anchor=names.resolve(policy.reference_anchor,sr.data.bones,default='')
+            x.anchor=anchor if anchor!=n else ''
+            motion=mapping.get(policy.reference_anchor,'');x.pose_target=names.resolve(motion,tr.data.bones,default='')
             candidates=[motion,motion.replace('cf_j_','cf_s_')]
             for a,b in [('shoulder','shoulder02'),('arm00','arm01'),('thigh00','thigh01'),('leg01','leg01')]:
                 candidates.append(motion.replace('cf_j_'+a,'cf_s_'+b))
-            x.weight_target=next((v for v in candidates if v in support),'')
+            x.weight_target=names.first(candidates,support)
             x.finger=finger_name(n)
-            x.semantic=vr.VRC_MOTION_SEMANTICS.get(n,'NONE')
+            x.semantic=names.lookup(vr.VRC_MOTION_SEMANTICS,n,'NONE')
             # Fingers start disabled; user must choose a matching enabled mapping
             # or an explicit non-finger destination before running.
     count=generate_regions(p)
@@ -309,7 +320,7 @@ def scan(p):
 def generate_regions(p):
     sr=rig(p.source);roles={x.name:x.role for x in p.bones}
     weighted={n for row in wf.read_weights(p.source) for n in row}
-    known={n for n,policy in vr.VRC_WEIGHT_POLICIES.items() if policy.source_role=='BODY'}
+    known=names.matched(sr.data.bones.keys(),{n for n,policy in vr.VRC_WEIGHT_POLICIES.items() if policy.source_role=='BODY'})
     roots=discover_roots({b.name:b.parent.name if b.parent else None for b in sr.data.bones},roles,weighted,known)
     existing={r.root for r in p.regions if r.root};added=0
     for root in sorted(roots):
@@ -530,6 +541,7 @@ def prepare(p):
     root=folder(p)/('run-'+uuid.uuid4().hex[:12]);root.mkdir()
     plan['excluded_body_groups']=sorted(c['sampling_replacements'])
     plan['managed_groups']=sorted(set(plan['managed_groups'])|set(c['sampling_replacements']))
+    influence_blender.limit_initial_plan(plan,influence_blender.settings(p))
     bpy.ops.wm.save_as_mainfile(filepath=str(root/'before.blend'),copy=True)
     from . import mmd_preprocess as prep
     collection=prep.create_collection('Weight source reference')
@@ -544,6 +556,8 @@ def prepare(p):
     save(root/'settings.json',dump_settings(p));save(root/'initial-plan.json',plan)
     p.run=str(root);p.fingerprint=fingerprint(p);p.initial=None;p.macro=None;p.final=None
     p.status=_fmt('Six-class preview complete: {v0} vertices; fallback {v1} vertices. Ready to write an initialization copy.', v0=len(plan['writes']), v1=len(plan.get('regional_fallback', {})))
+    support=plan['influence_support']
+    p.status+=' '+support['representation']+'; '+str(len(support['over_limit_vertices']))+' influence-limit exceptions.'
 
 def fresh(p):
     if not p.run or fingerprint(p)!=p.fingerprint:raise ValueError('Configuration changed or was not previewed; prepare the six-class plan again')
@@ -561,6 +575,7 @@ def write_initial(p):
     except Exception:
         bpy.data.objects.remove(copy,do_unlink=True);raise
     save(root/'initial-writeback.json',report);p.initial=copy;copy.hide_set(False);copy.hide_render=False;p.target.hide_set(True);p.target.hide_render=True
+    p.influence_report=json.dumps(dict(report['influence_support'],object=copy.name,stamp=wf.stamp(copy)))
     p.status='Six-class initialization written to a copy; source weights and the fitted original are preserved.'
 
 def poses(p,local):
@@ -593,6 +608,11 @@ def export_stage(p,stage):
     from .mmd_preprocess import bones as reference_bones
     if core.digest(reference_bones(rig(reference)))!=p.reference_structure:raise ValueError('Frozen source rig structure or constraints changed; prepare again')
     args['excluded_body_groups']=sorted(c['sampling_replacements'])
+    args['influence_policy']=influence_blender.settings(p)
+    if not local:
+        initial_plan=json.loads((root/'initial-plan.json').read_text())
+        dense=initial_plan.get('dense_reference_writes')
+        if dense:args['dense_reference']=[dense[str(i)] for i in range(len(obj.data.vertices))]
     if p.source_sampling=='EVALUATED':args['source_contract']=optimization.source_pose_contract(reference)
     if local:
         if not p.local_vertices or p.local_topology!=wf.topology(p.source):raise ValueError('Capture a valid terminal vertex selection')
@@ -610,6 +630,28 @@ def export_stage(p,stage):
             'pose_bones':{'source':sorted({x.source for x in p.motions if x.endpoint}),'target':sorted({n for x in p.motions if x.endpoint for n,f in motion_control(x,0)['target']})},
             **TERMINAL})
     a,m=optimization.export_context(reference,obj,p.body,**args)
+    if local:
+        # Earlier macro holdouts remain validation-only; they are never added to
+        # terminal fitting or support ranking.
+        macro_path=Path(json.loads((root/'macro-current.json').read_text())['directory'])
+        mm=json.loads((macro_path/'context.json').read_text())
+        with np.load(macro_path/'context.npz') as z:ma={k:z[k] for k in z.files}
+        with np.load(macro_path/'candidate.npz') as z:mc={k:z[k] for k in z.files}
+        mr=json.loads((macro_path/'report.json').read_text())
+        if mm['context_id']!=core.digest({k:v for k,v in mm.items() if k!='context_id'}) or mm['arrays_digest']!=core.digest({k:v.tolist() for k,v in ma.items()}):
+            raise ValueError('Macro regression context changed')
+        if mr['candidate_digest']!=core.digest(mc['weights'].tolist()) or mr['reference_digest']!=core.digest(mc['reference'].tolist()):
+            raise ValueError('Macro regression candidate/reference changed')
+        columns=[mm['target_names'].index(n) for n in m['target_names']]
+        if np.max(abs(optimization._dense(wf.read_weights(obj),mm['target_names'])-mc['weights']))>1e-6:
+            raise ValueError('Main result changed before terminal regression export')
+        holdout=[i for i,spec in enumerate(mm['poses']) if spec['kind']=='holdout']
+        if not holdout:raise ValueError('Macro regression holdouts missing')
+        a['regression_matrices']=ma['target_matrices'][holdout][:,columns]
+        a['regression_reference']=mc['reference'][holdout]
+        a['regression_body_poses']=ma['body_poses'][holdout]
+        m['macro_regression_context']=mm['context_id']
+        m['arrays_digest']=core.digest({k:v.tolist() for k,v in a.items()})
     m['reference_mode']=p.reference_mode
     m['reviewed_region_modes']=c['region_modes'];m['workflow_settings_digest']=fingerprint(p,True)
     m['context_id']=core.digest({k:v for k,v in m.items() if k!='context_id'})
@@ -630,6 +672,7 @@ def validate_stage(p,stage):
     path,a,m,c,report=stage_data(p,stage)
     v=optimizer_validation.validate(a,m,c,report);save(path/'validation.json',v)
     p.status=('Validation passed; ready to save a copy.' if v['accepted'] else 'Weight checks passed; save and inspect collision vertices.' if v['non_contact_ok'] and p.collision_policy=='REVIEW' else 'Non-collision checks or strict policy failed; writing is blocked.')+_fmt(' held-out pose RMS {v0:.6g} → {v1:.6g}', v0=v['holdout_body_rms_before'], v1=v['holdout_body_rms_after'])
+    p.status+=' '+v['influence_support']['representation']+'.'
 
 def write_stage(p,stage):
     path,a,m,c,report=stage_data(p,stage);v=json.loads((path/'validation.json').read_text())
@@ -652,7 +695,14 @@ def write_stage(p,stage):
     copy.select_set(True);bpy.context.view_layer.objects.active=copy
     copy['kkvrc_collision_review']='PENDING' if not v['contact_ok'] else 'CLEAR'
     copy['kkvrc_previous_weight_result']=original.name;copy['kkvrc_validation_report']=str(path/'validation.json')
+    support=v.get('influence_support',{})
+    copy['kkvrc_influence_compatibility']=support.get('representation','UNLIMITED')
+    p.influence_report=json.dumps(dict(written['influence_support'],object=copy.name,stamp=wf.stamp(copy)))
+    if support.get('dynamic_changed_vertices') or original.get('kkvrc_dynamic_baseline_stamp'):
+        copy['kkvrc_dynamic_baseline_stamp']=wf.stamp(copy)
     p.status='Saved '+copy.name+('; collision vertices selected for review; reverting remains available.' if not v['contact_ok'] else '; checks passed.')
+    if support.get('over_limit_vertices'):
+        p.status+=' '+str(len(support['over_limit_vertices']))+' unchanged influence-limit exceptions require runtime review.'
     bpy.ops.wm.save_as_mainfile(filepath=str(path/'result.blend'),copy=True)
 
 def review_result(p, rollback=False):
@@ -690,6 +740,7 @@ class KKVRC_OT_workflow(bpy.types.Operator):
             if self.action=='SCAN':scan(p)
             elif self.action=='CLEAR':
                 p.bones.clear();p.targets.clear();p.regions.clear();p.motions.clear();p.fingerprint='';p.status='Configuration cleared; garment results preserved.'
+                influence_blender.load_settings(p,{'max_influences':4})
             elif self.action=='GENERATE_REGIONS':generate_regions(p);analyze_regions(p)
             elif self.action=='ANALYZE_REGIONS':analyze_regions(p)
             elif self.action=='CONFIRM_REGION':confirm_region(p)
@@ -712,11 +763,11 @@ class KKVRC_OT_workflow(bpy.types.Operator):
                 if not p.regions:raise ValueError('Add a region and choose its chain root first')
                 r=p.regions[p.region_index];root=rig(p.source).data.bones.get(r.root)
                 if not root:raise ValueError('Select a valid source chain root')
-                names={b.name for b in [root]+list(root.children_recursive)}
-                conflicts=[n for n in names if (n in vr.VRC_WEIGHT_POLICIES and vr.VRC_WEIGHT_POLICIES[n].source_role=='BODY') or any(x.name==n and x.role=='BODY' for x in p.bones)]
+                chain_names={b.name for b in [root]+list(root.children_recursive)}
+                conflicts=[n for n in chain_names if (names.lookup(vr.VRC_WEIGHT_POLICIES,n) and names.lookup(vr.VRC_WEIGHT_POLICIES,n).source_role=='BODY') or any(x.name==n and x.role=='BODY' for x in p.bones)]
                 if conflicts:raise ValueError('Subtree contains recognized body bones and cannot be marked entirely dynamic: '+str(conflicts))
                 for x in p.bones:
-                    if x.name in names:x.role='DYNAMIC'
+                    if x.name in chain_names:x.role='DYNAMIC'
                 p.status='Weighted bones in this chain marked as retained dynamic bones; region mode still needs approval.'
             elif self.action=='REMOVE_MOTION':
                 if p.motions:p.motions.remove(p.motion_index);p.motion_index=max(0,p.motion_index-1)
@@ -738,6 +789,8 @@ class KKVRC_OT_workflow(bpy.types.Operator):
             elif self.action=='IMPORT_PRESET':
                 data=json.loads(Path(bpy.path.abspath(p.preset)).read_text(encoding='utf-8-sig'))
                 if data.get('schema')!=1:raise ValueError('Unsupported workflow configuration format')
+                context.scene.kkvrc_bone_name_mode=names.mode(data.get('bone_name_mode','AUTO'))
+                influence_blender.load_settings(p,data.get('influence_policy'))
                 for key in ['bones','targets','regions','motions']:
                     coll=getattr(p,key);coll.clear()
                     for values in data[key]:
@@ -826,6 +879,7 @@ def draw(layout,context):
     box=layout.box();box.label(text='1 · Inputs and scan')
     for key in ['source','target','body']:box.prop(p,key)
     box.prop(p,'source_profile')
+    bone_names_ui.draw(box,context.scene)
     if p.source_profile!='VRC':box.prop(p,'mmd_profile_path')
     box.prop(p,'source_sampling');box.prop(p,'reference_mode')
     if p.reference_mode=='FITTED':box.label(text='Source must retain complete original weights and match the fitted mesh; preparation freezes a copy.',icon='INFO')
@@ -902,6 +956,7 @@ def draw(layout,context):
         button(box,'Add region manually','ADD_REGION')
     button(box,'Check regions and mappings','CHECK')
     box=layout.box();box.label(text='3 · Six-class transfer and main optimization')
+    influence_blender.draw(box,p)
     box.prop(p,'output')
     box.prop(p,'collision_policy');box.prop(p,'exclude_bnip')
     row=box.row(align=True);button(row,'Select collision vertices','REVIEW_CONTACTS');button(row,'Revert to previous version','ROLLBACK_RESULT')

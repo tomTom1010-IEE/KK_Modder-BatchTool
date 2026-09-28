@@ -2,21 +2,21 @@
 
 [Project showcase](README.md) · [Technical report](docs/technical-report.md)
 
-**Based on source version 0.2.17, September 20, 2026.** Updating the add-on does not automatically modify existing scene weights or repair earlier results.
+**Updated for source version 0.3.0, September 28, 2026**, including total-influence controls and the Stage 3 panel-drawing fix. Updating the add-on does not automatically modify existing scene weights or repair earlier results.
 
-The workflow walkthrough below describes the 0.2.17 snapshot. Version 0.2.24 provides English source labels and Simplified Chinese localization; see [localization notes](LOCALIZATION.md). Later MMD and collision-review additions are documented in the [0.2.20 workflow update](docs/WEIGHT_WORKFLOW_0_2_20_CN.md) (Chinese). Some control wording and panel organization have changed since this walkthrough.
+The garment execution controls below follow the current source UI. English labels have Simplified Chinese localization; see [localization notes](LOCALIZATION.md). Older screenshots and the historical [0.2.20 workflow notes](docs/WEIGHT_WORKFLOW_0_2_20_CN.md) may use different wording. Repository changes take effect in Blender only after updating the installed add-on and reloading it.
 
 ## 1. Installation and entry points
 
 The declared minimum is Blender 4.3. Local case studies used Blender 5.2; not every intervening version has been verified.
 
-1. Download the appropriate package from [Releases](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases). To build from source, run `python tools/build_addon.py /path/to/kk_vrc_cloth_tools-0.2.24.zip`, replacing the output path with your preferred location. The builder includes the required bone-profile JSON files. Do not ZIP only the source package folder or install the entire repository ZIP.
+1. Download the appropriate package from [Releases](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases). To build from source, run `python tools/build_addon.py /path/to/kk_vrc_cloth_tools-0.3.0.zip`, replacing the output path with your preferred location. The builder includes the required bone-profile JSON files. Do not ZIP only the source package folder or install the entire repository ZIP.
 2. Use **Edit → Preferences → Add-ons → Install from Disk…** and enable **KK/VRC Cloth Tools**. Reload the add-on or restart Blender after upgrading; check the installed version.
 3. Press **N** in the 3D Viewport and open **KK/VRC Tools**.
 
 | Panel order | Purpose |
 |---|---|
-| Garment Weights · Conservative Beginner Preset | Guided parameters with required region review |
+| Garment Weights · Beginner Preset | Guided parameters with required region review |
 | Dynamic Garment Weight Transfer | Six-category initialization, macro optimization, optional terminal refinement |
 | Complex Flat-Shoe Weight Transfer | Native sampling, toe extension, continuity repair, and A/B separation refinement |
 | Manual Editing | Bone grafting, chain editing, glove alignment, and utilities |
@@ -42,6 +42,20 @@ Automatic installation has been tested on Windows x64, including the missing-Pyt
 
 Six-category initialization, preprocessing, manual tools, and shoes do not require this external environment. The installer is included in release ZIPs; Python and solver binaries are downloaded only when the user starts installation.
 
+### Global bone suffix compatibility
+
+**config → Bone Name Compatibility** provides one scene-wide setting, also shown beside the garment and shoe scan controls. It applies to source recognition (VRC and MMD), target bone lookup, and the supported mapping/grafting tools. It does not rename bones or vertex groups.
+
+- **Automatic (. / _)** (default): accept exact maintained names, then try the alternate final suffix separator. Examples: `LowerArm.L` / `LowerArm_L`, `Breast_R.001` / `Breast_R_001`, and target `cf_j_hand_L` / `cf_j_hand.L`.
+- **Period (.)**: keep exact maintained names valid; accept additional imported spellings only when their final separator is a period.
+- **Underscore (_)**: keep exact maintained names valid; accept additional imported spellings only when their final separator is an underscore.
+
+Only terminal `L`, `R`, and three-digit numeric suffixes are compatible. Internal separators, numeric values, capitalization, and unknown names are preserved. MMD's existing Japanese names and `name_j` recognition remain available; side suffix variants such as `腕.L` / `腕_L` use the same global policy. This is spelling compatibility, not a new anatomical or breast-to-bust mapping.
+
+If both equivalent names exist in the same bone or vertex-group inventory, automatic scanning stops for disambiguation. The resolver never merges them. Bone/vertex-group binding inside each imported asset must still be valid in Blender; this option does not repair unbound groups. Rescan after changing the setting. Garment and shoe configuration exports record the mode; older files default to Automatic when imported. Importing the mode changes the shared scene setting, so it also affects other workflows in that scene.
+
+The implementation is in [`bone_names.py`](kk_vrc_cloth_tools/bone_names.py), separate from VRC, MMD, and KK rule data. Numerical stages consume resolved real names; the six budgets, optimization objectives, and four-influence policy are unchanged. [Developer contract](docs/bone-name-compatibility.md).
+
 ## 2. Prepare three inputs
 
 | Input | Requirements |
@@ -56,13 +70,13 @@ Active shape keys, envelopes, Preserve Volume skinning, complex drivers or const
 
 ## 3. Dynamic garments: beginner workflow
 
-Use this branch for jackets and garments with secondary-motion attachments. A skirt with body-following attachment weights and a dynamic hem also belongs here, although this project has no completed skirt case study.
+Use this branch for jackets and garments with secondary-motion attachments. A skirt with body-following attachment weights and a dynamic hem also belongs here. The archived MMD skirt-outfit experiment provides limited cross-rig evidence; broader skirt-specific validation remains open.
 
-1. In **Garment Weights · Conservative Beginner Preset**, specify the three inputs and output directory. Choose upper-body, lower-body, full-body, or automatic motion coverage. Decide whether to preserve source finger influence according to the original design.
-2. Click **① Apply Conservative Preset and Scan**.
+1. In **Garment Weights · Beginner Preset**, specify the three inputs and output directory. Choose upper-body, lower-body, full-body, or automatic motion coverage. Decide whether to preserve source finger influence according to the original design.
+2. Click **1. Apply conservative preset and scan**.
 3. Review every dynamic region. Use **Highlight Region**, optionally **Confirm This Chain as Retained Dynamic Bones**, and then **Confirm Region Mode**. If highlighting enters Edit Mode, press Tab to return to Object Mode.
 4. Resolve uncertain roles, regions, and mappings. The preset does not automatically approve unknown bones as clothing dynamics.
-5. Click **③ Compute → Validate → Create Copy**. This uses the detailed workflow's initialization, solver, and validation backends. Failed validation stops execution rather than writing a failed optimized result.
+5. In **Runtime influence compatibility**, choose four or unlimited and leave dynamic compression off unless explicitly needed. Click **3. Solve → validate → create copies**. This uses the detailed workflow's initialization, solver, and validation backends. Failed validation stops execution rather than writing a failed optimized result. Preserved influence-limit exceptions are reported separately: a written copy can still require runtime review.
 6. Inspect copies and reports, preview relevant poses, and save the `.blend`. Press Esc to cancel a running operation.
 
 Terminal refinement is off by default. Before enabling **Continue with Terminal Refinement in the Specified Region**, configure its vertex scope, terminal poses, and allowed bones in the detailed panel.
@@ -97,19 +111,44 @@ Target sampling does not automatically introduce finger influence. Explicitly en
 
 ### Stage 3 · Six-category transfer and macro optimization
 
-1. Set **Run Output Directory**. Blender's native nearest-face interpolation is the default. Expand **Advanced Solver Parameters** to choose an existing target distribution or semantic mapping alone.
-2. Click **Preview Six-Category Initialization**, inspect it, then **Write Initial Copy**.
-3. Click **Generate Preset Poses (Add Missing Entries)**. Enable **Edit Pose Presets** to change motion coverage or individual poses. Axes and multi-bone target distribution are under **Advanced Pose Settings**. After **Preview Pose**, click **Restore Pose**.
-4. Keep **Enable Collision-Constraint Iterations** as appropriate and click **Solve Macro Weights**.
-5. Run **Independent Validation**, then **Write Macro Copy** after acceptance. Solver completion alone is not acceptance.
+The on-screen section is **3 · Six-class transfer and main optimization**. It is a section box, not a collapsed header. If only its title is visible, follow the panel-error troubleshooting entry below.
 
-The six categories are torso including head/neck, left arm, right arm, left leg, right leg, and retained dynamics. Shares remain fixed per vertex. Dynamic weights and enabled finger contributions stay fixed; optimization redistributes remaining body weights within categories. Do not follow this workflow with legacy body-weight erasure in dynamic regions or all-group normalization.
+#### Choose a total influence policy
+
+The **Runtime influence compatibility** box is shared by the beginner, garment, and shoe panels. New configurations use **Four (body + dynamics + fingers)**; legacy saved configurations and imported JSON without this policy use **Unlimited (legacy)**. You can change either explicitly. **Allow approximate dynamic compression** defaults to off. Changing these settings invalidates prepared plans and shoe checkpoints; preview or generate A again.
+
+| Control | How to use it |
+|---|---|
+| **Total influences per vertex → Four (body + dynamics + fingers)** | Use for a deployment that requires at most four bone weights. Includes every final positive body, dynamic, and enabled finger weight. |
+| **Total influences per vertex → Unlimited (legacy)** | Keep the dense method when the actual importer/runtime permits it. Does not retroactively restore weights already reduced in another run; start again from the original complete source. |
+| **Allow approximate dynamic compression** | Optional, default off; displayed in Four mode. Enable only to test resolving slot conflicts by approximating individual dynamic contributions. It does not guarantee that every conflict is solvable. |
+| **Dynamic response tolerance / mesh span** | Displayed only when compression is enabled. Default 0.002 is a normalized displacement threshold, not an absolute distance or a percentage of weight to delete. |
+
+For the project's stated deployment variants, select **Four** for the Unity 5.6 target and **Unlimited** for the Unity 2019.4.6 target configured to accept unrestricted influences. These are choices for those target setups, not a claim that every application using either Unity version has the same limit. There is no engine-version preset selector; verify the actual import and runtime settings separately.
+
+Use **Scan influence counts** to inspect the latest result (or fitted input before a result exists), and **Select over-limit vertices** to inspect its exceptions in Edit Mode. Return to Object Mode before solving. Four is the combined total, not four body bones plus additional dynamic/finger bones. Tiny positive category budgets are not discarded to make the count pass.
+
+1. Set **Run Output Directory**. Blender's native nearest-face interpolation is the default. Expand **Advanced Solver Parameters** to choose an existing target distribution or semantic mapping alone.
+2. Click **Preview six-class initialization**, inspect it, then **Write initialization copy**.
+3. Click **Generate preset poses (add missing entries)**. Enable pose-preset editing to change motion coverage or individual poses. Axes and multi-bone target distribution are under advanced pose settings. After **Preview pose**, click **Restore pose**.
+4. Choose the collision policy and contact-constraint iterations as appropriate, then click **Solve main weights**.
+5. Run **Independent validation**, then **Write main copy** after acceptance. Solver completion alone is not acceptance.
+
+The six categories are torso including head/neck, left arm, right arm, left leg, right leg, and retained dynamics. Shares remain fixed per vertex. By default, each dynamic weight and enabled finger contribution stays fixed; optimization redistributes remaining body weights within categories. With four influences enabled, the plugin selects feasible bone combinations before fitting, retaining a separate dense initialization reference. Do not follow this workflow with legacy body-weight erasure, all-group normalization, or unreviewed global top-four cleanup.
+
+If fixed dynamics/fingers and positive body categories cannot fit, those vertices remain unchanged. Other feasible vertices continue. `RUNTIME_REVIEW_REQUIRED` means the copy is **not** strictly four-influence compatible; collision review does not waive that condition. `STRICT_FOUR` reports numerical support compatibility only, not a Unity import test. `UNLIMITED` retains the dense workflow.
+
+Optional dynamic compression only targets slot conflicts. It reserves body/finger slots, rescales retained dynamic weights within the original dynamic total, and checks independent bend/twist probes. Fingers remain fixed. Missing or failed probe/collision evidence prevents accepted compressed writeback; a shoe candidate can fall back to unchanged exception vertices. The tolerance is normalized by garment span and needs asset review. See [implementation details and report fields](docs/influence-limits.md).
+
+**Read the result before export.** Scan the final object again after manual weight edits or a policy change; the current UI's previous scan text is not an automatically refreshed certificate. `STRICT_FOUR` checks the weight count, while motion/contact acceptance is a separate result and Unity runtime validation is not automated. `RUNTIME_REVIEW_REQUIRED` means some unchanged vertices still exceed four; inspect them with **Select over-limit vertices**. Do not use global Normalize All or a blind Limit Total cleanup to hide them. Either review the exceptions, test optional compression and revalidate, or use the unlimited target when that deployment permits it.
+
+**Expected cost and fidelity.** In the two-jacket [controlled dry run](docs/influence-limit-benchmark.md), unlimited output matched the old weights exactly. Four-mode macro solves took about 1.8–2.0 times as long; the complete numeric path took 53 and 65 seconds in single runs. The open jacket's terminal RMS increased 8.68%, despite slightly better macro RMS. These are case measurements, not a progress estimate or a quality guarantee for other assets. The current UI shows a general running message; per-stage diagnostics are in `solver.log`, not a new progress dashboard. Press Esc to cancel a running solve.
 
 ### Stage 4 · Local terminal refinement in T-pose (optional)
 
-Use this for confirmed wrist/hand problems, not every garment. Capture **Terminal Vertex Selection**, mark candidates as **Allow Terminal Optimization** in target-bone advanced settings, and mark relevant poses as terminal poses. Run **Solve Terminal Weights → Independent Validation → Write Terminal Copy**.
+Use this for confirmed wrist/hand problems, not every garment. Click **Capture terminal vertex selection**, mark candidates as **Allow Terminal Optimization** in target-bone advanced settings, and mark relevant poses as terminal poses. Run **Solve terminal weights → Independent validation → Write terminal copy**.
 
-Unrelated macro controls remain at baseline, and weights outside the permitted scope are frozen. Transition-ring count and small-angle settings are under **Advanced Solver Parameters**.
+Unrelated macro controls remain at baseline, and weights outside the permitted scope are frozen. Transition-ring count and small-angle settings are under **Advanced Solver Parameters**. Terminal fitting obeys the same total limit and local correction bounds. UI-generated terminal runs additionally validate the earlier macro holdouts, without using those holdouts for fitting.
 
 ## 5. Complex flat shoes
 
@@ -119,7 +158,7 @@ This branch targets the new foot's spatial weight distribution and motion-depend
 2. **Review Body and Lace Regions:** inspect each chain's side, role, and mixing pattern. Use **Confirm This Root Chain as Dynamic**, inspect its mesh region, and enable **Region and Shares Reviewed**. Unrecognized cases require per-vertex analysis and a documented conclusion in manual-analysis mode. Confirm **Use Target-Foot Spatial Distribution and Preserve Source Body/Dynamic Shares**.
 3. **Directions, Extension, and Continuity:** scanning infers world directions from ankle, forefoot, and shin reference positions. If inference fails, **Manually Set Foot Bones and Directions** expands with a diagnostic. Review motion bones, up direction, and forefoot direction before using direction inference. These are not simply bone-local Y axes.
 4. **Flat-Shoe Pose Presets and Optimization:** defaults normally suffice. Enable **Edit Pose Presets** to expose random count, weight, and seed. **Include Gap Optimization B in One-Click Run** controls the combined workflow.
-5. **Execution and Results:** set the directory and click **Check Configuration**. Run **Generate A: Sampling and Continuity → Optimize B from A**, or **Run All (Keep Original Shoe)**. B resumes a valid A checkpoint without repeating sampling; changed inputs or checkpoints invalidate reuse.
+5. **Run and Results:** set the directory and click **Check configuration**. Run **Build A: sampling and continuity → Optimize B from A**, or **Run all (preserve original shoes)**. B resumes a valid A checkpoint without repeating sampling; changed inputs or checkpoints invalidate reuse.
 6. Compare using **Original / A / B**, inspect RMS, and use **Open Run Report Directory**. Failed B validation leaves A available and prevents accepted-result writeback of B.
 
 JSON is optional. **Configuration Files and Naming** provides import/export and copy prefixes. Review current objects and regions after importing.
@@ -136,6 +175,8 @@ JSON is optional. **Configuration Files and Naming** provides import/export and 
 | Minimum trusted sample mass / Preserve-A strength | 0.01 / 0.1 under the same advanced section |
 
 The whole-forefoot `toes` bone is not an individual-finger control. A shin control can receive weights only if supported by actual body groups; do not force weights onto an unweighted `cf_j_leg03`. Continuity repair does not connect opposite feet or bridge disconnected layers through spatial proximity. Pure dynamic laces retain zero body budget.
+
+The shoe compatibility box constrains the final body-plus-lace weights. A retains a dense reference, selects a permitted support, and repeats continuity repair within it; B uses that support throughout projection. Exception rows remain frozen. `influence-support.json` records A's decisions, and `report.json` includes full-mesh A/B counts. A field result still requires ordinary geometric/visual inspection.
 
 ## 6. MMD preparation
 
@@ -167,6 +208,10 @@ Garments produce initial, macro, and terminal copies; shoes produce A and an acc
 |---|---|
 | Missing direction/random settings | Expand manual directions, pose editing, or advanced settings |
 | Old Step 1–5 interface | Check installed path, version, and reload status; repository changes do not update Blender's installed copy |
+| Stage 3 shows only its title; shoe controls may also stop drawing | This is not a foldout. Install the current 0.3.0 source patch and reload/restart Blender. An earlier draw callback tried to write `influence_version` during drawing, producing `Writing to ID classes in this context is not allowed`; the patch makes drawing read-only. Do not clear your configuration to work around it. |
+| An old file unexpectedly defaults to Four after a partial hot reload | Check the actual installed package and perform a complete reload/restart so the saved-configuration migration callback is registered. Review the policy before preparing weights. |
+| Solve succeeded but `RUNTIME_REVIEW_REQUIRED` remains | Inspect unchanged over-limit vertices. Motion/contact acceptance does not certify four-influence compatibility. |
+| Scan still describes a previous object or weights | Run **Scan influence counts** on the current workflow result again; inspect the object name in the report. |
 | Unresolved region blocks processing | Inspect chain and per-vertex weights; do not arbitrarily approve a gradient or dynamic role |
 | Source bones/configuration changed | Rescan and review; do not force stale signatures or A checkpoints |
 | Positive budget without candidates | Check real body support and mappings; do not fill unweighted helpers |

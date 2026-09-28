@@ -1,3 +1,4 @@
+from . import bone_names
 import fnmatch
 from collections import deque
 
@@ -873,12 +874,13 @@ def collect_weighted_bone_group_names(meshes, armature_obj):
 
 
 def collect_detach_roots_from_meshes(armature_obj, meshes):
+    bone_names.assert_unique(armature_obj.data.bones.keys())
     parent_map = get_parent_map(armature_obj)
     weighted_names = collect_weighted_bone_group_names(meshes, armature_obj)
     dynamic_weighted = [
         name
         for name in weighted_names
-        if not bone_rules.is_kk_standard_body_bone(name) and not vrc_bone_rules.is_vrc_graft_stop_bone(name)
+        if not bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', name) and not vrc_bone_rules.is_vrc_graft_stop_bone(bone_names.canonical(name,vrc_bone_rules.VRC_STANDARD_BODY_BONES))
     ]
     roots = []
 
@@ -887,8 +889,8 @@ def collect_detach_roots_from_meshes(armature_obj, meshes):
         parent_name = parent_map.get(current)
         while (
             parent_name
-            and not bone_rules.is_kk_standard_body_bone(parent_name)
-            and not vrc_bone_rules.is_vrc_graft_stop_bone(parent_name)
+            and not bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', parent_name)
+            and not vrc_bone_rules.is_vrc_graft_stop_bone(bone_names.canonical(parent_name,vrc_bone_rules.VRC_STANDARD_BODY_BONES))
         ):
             current = parent_name
             parent_name = parent_map.get(current)

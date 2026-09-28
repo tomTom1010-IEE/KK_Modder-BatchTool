@@ -320,15 +320,31 @@ def _weight_policy(rule):
 
 VRC_WEIGHT_POLICIES = {name: _weight_policy(rule) for name, rule in VRC_STANDARD_BODY_BONES.items()}
 
-# Semantic slots used by motion presets; aliases remain avatar-profile data.
-VRC_MOTION_SEMANTICS = {'Hips':'HIPS','Spine':'SPINE','Chest':'CHEST','Neck':'NECK','Head':'HEAD'}
+# Source naming belongs to this rule library. Multiple observed spellings share
+# one anatomical slot; target-specific destinations live in vrc_kk_mapping.
+# These are exact maintained names, not global punctuation/substring matching.
+VRC_BODY_SEMANTICS = {'Hips':'HIPS','Spine':'SPINE','Chest':'CHEST','Neck':'NECK','Head':'HEAD'}
 for _side in ('L','R'):
     for _semantic,_aliases in {
+        'SHOULDER':('Shoulder',),
         'UPPER_ARM':('Upper_arm','UpperArm'),'LOWER_ARM':('Lower_arm','LowerArm'),
         'HAND':('Hand',),'UPPER_LEG':('Upper_leg','UpperLeg'),
-        'LOWER_LEG':('Lower_leg','LowerLeg'),'FOOT':('Foot',),
+        'LOWER_LEG':('Lower_leg','LowerLeg'),'FOOT':('Foot',),'TOES':('Toe',),
     }.items():
-        for _alias in _aliases:VRC_MOTION_SEMANTICS[f'{_alias}.{_side}']=f'{_semantic}_{_side}'
+        for _alias in _aliases:VRC_BODY_SEMANTICS[f'{_alias}.{_side}']=f'{_semantic}_{_side}'
+    for _finger in ('Thumb','Index','Middle','Ring','Little'):
+        for _joint in ('Proximal','Intermediate','Distal'):
+            for _name in (f'{_finger} {_joint}.{_side}', f'{_finger}{_joint}.{_side}'):
+                VRC_BODY_SEMANTICS[_name] = f'{_finger.upper()}_{_joint.upper()}_{_side}'
+
+# Keep existing motion-preset slots unchanged. Finger joints and shoulders are
+# mapping semantics, not extra macro-pose controls or additional budget classes.
+VRC_MOTION_SEMANTICS = {
+    name: semantic for name, semantic in VRC_BODY_SEMANTICS.items()
+    if semantic in {'HIPS','SPINE','CHEST','NECK','HEAD'}
+    or any(semantic.startswith(prefix + '_') for prefix in
+           ('UPPER_ARM','LOWER_ARM','HAND','UPPER_LEG','LOWER_LEG','FOOT'))
+}
 
 
 def audit_vrc_weight_roles(rows, bones, roles, avatar=None):

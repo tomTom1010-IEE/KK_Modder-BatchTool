@@ -18,6 +18,7 @@
 \DeclareMathOperator*{\argmin}{arg\,min}
 \input{response_rows.tex}
 \input{semantic_rows.tex}
+\input{influence_rows.tex}
 \setlength{\emergencystretch}{1.5em}
 \setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
 \setlength{\floatsep}{10pt plus 2pt minus 2pt}
@@ -29,14 +30,14 @@
 \makeatother
 \title{\vspace{-1.4em}\textbf{Semantic Budget-Constrained Skinning Transfer\\for Garment Retargeting}}
 \author{tomTomIEE\\\small Independent Research\\\small\href{https://github.com/tomTom1010-IEE/KK_Modder-BatchTool}{KK Modder BatchTool}}
-\date{\small Technical manuscript \;\textbullet\; September 2026}
+\date{\small Technical manuscript \;\textbullet\; Revised September 28, 2026}
 \hypersetup{pdftitle={Semantic Budget-Constrained Skinning Transfer for Garment Retargeting},pdfauthor={tomTomIEE},pdfsubject={Semantic influence conservation and constrained garment skinning transfer},pdfkeywords={skinning, garment retargeting, semantic budgets, quadratic programming}}
 \begin{document}
 \raggedbottom
 \maketitle
 
 \begin{abstract}
-Retargeting a skinned garment to a different character requires preserving an authored allocation of body and secondary-motion influence while adapting to new geometry and skeletal structure. Purely spatial weight transfer can cross semantic boundaries in layered clothing, introduce body influence into freely moving panels, and generate discontinuities on extended footwear. We present \emph{Semantic Budget-Constrained Skinning Transfer} (SBCST), a framework that separates the amount of influence assigned to a semantic category from its distribution among target bones. Per-vertex source budgets define a feasible set; native surface samples and reviewed semantic mappings initialize distributions within that set. Fixed-transform quadratic fitting then adapts body response using paired garment rest geometry, followed by optional local terminal refinement. A complementary footwear formulation regularizes spatial influence fields and fits pose-dependent separation. Explicit contact-review masks support scoped validation in the presence of authored intersections. In two local garment studies, initialization eliminates all measured wrong-category vertices (28 and 2,175), while preserving budgets to approximately $5\times10^{-8}$ after writeback. Final held-out response reductions relative to native transfer range from 0.012\% to 50.735\% across four evaluation scopes. A shoe study reduces held-out separation error by 4.990\%. These results establish a working constrained transfer pipeline and initial cross-rig applicability, with broader generalization and continuous collision guarantees left open.
+Retargeting a skinned garment to a different character requires preserving an authored allocation of body and secondary-motion influence while adapting to new geometry and skeletal structure. Purely spatial weight transfer can cross semantic boundaries in layered clothing, introduce body influence into freely moving panels, and generate discontinuities on extended footwear. We present \emph{Semantic Budget-Constrained Skinning Transfer} (SBCST), a framework that separates the amount of influence assigned to a semantic category from its distribution among target bones. Per-vertex source budgets define a feasible set; native surface samples and reviewed semantic mappings initialize distributions within that set. Fixed-transform quadratic fitting then adapts body response using paired garment rest geometry, followed by optional local terminal refinement. A complementary footwear formulation regularizes spatial influence fields and fits pose-dependent separation. Explicit contact-review masks support scoped validation in the presence of authored intersections. In two local garment studies, initialization eliminates all measured wrong-category vertices (28 and 2,175), while preserving budgets to approximately $5\times10^{-8}$ after writeback. Final held-out response reductions relative to native transfer range from 0.012\% to 50.735\% across four evaluation scopes. A shoe study reduces held-out separation error by 4.990\%. An optional cardinality extension selects sparse supports under the same budgets, with explicit infeasibility reporting and measured deployment tradeoffs. These results establish a working constrained transfer pipeline and initial cross-rig applicability, with broader generalization and continuous collision guarantees left open.
 \end{abstract}
 \noindent\textbf{Keywords:} skinning transfer, garment retargeting, semantic influence budgets, constrained optimization, secondary motion.
 
@@ -47,11 +48,9 @@ Changing character proportions compounds the problem. The fitted garment can hav
 
 We formulate transfer as the preservation of \emph{semantic influence budgets}. Each source vertex allocates a normalized amount of influence to broad body categories and to retained clothing bones. This allocation remains fixed, while weights within a target body category are allowed to change. The central distinction is between \emph{which category may act} and \emph{how its allowed share should be distributed}. Geometry supplies evidence for the latter, not permission to override the former.
 
-Our implementation uses six categories: torso (including head and neck), the four individual limbs, and retained dynamic influence. The formulation admits other partitions; six is an implementation choice, not a requirement of the mathematics. Selected finger weights are reserved inside their limb budgets rather than creating additional categories. Clothing-bone weights remain fixed individually, so optimization cannot consume a free panel's secondary-motion allocation to improve a body-response metric.
+Our implementation uses six categories: torso (including head and neck), the four individual limbs, and retained dynamic influence. The formulation admits other partitions; six is an implementation choice, not a requirement of the mathematics. Selected finger weights are reserved inside their limb budgets rather than creating additional categories. In the core method, clothing-bone weights remain fixed individually, so optimization cannot consume a free panel's secondary-motion allocation to improve a body-response metric.
 
 SBCST combines this constraint with two fitting objectives. For ordinary garments, we transport source motion through paired original/fitted rest geometry and anatomical frames, then optimize target body weights. For extended flat shoes, we instead preserve spatial association to the target foot and optionally refine separation over poses. Both share fixed budgets, admissible target-bone support, and independent validation.
-
-Our contributions are (1) a practical decomposition of garment transfer into conserved semantic budgets and adaptable within-category distributions; (2) a fixed-transform fitting pipeline with proportion-aware motion transport and bounded terminal refinement; and (3) an inspectable implementation with spatial footwear fitting, explicit review boundaries, and same-input quantitative comparisons. We present a technical method and local evidence, rather than claiming a universally automatic retargeting solution or a new skinning decomposition algorithm.
 
 \begin{figure*}[t]
 \centering\includegraphics[width=\textwidth]{figures/pipeline.pdf}
@@ -59,9 +58,15 @@ Our contributions are (1) a practical decomposition of garment transfer into con
 \label{fig:pipeline}
 \end{figure*}
 
+Our contributions are (1) a practical decomposition of garment transfer into conserved semantic budgets and adaptable within-category distributions; (2) a fixed-transform fitting pipeline with proportion-aware motion transport and bounded terminal refinement; and (3) an inspectable implementation with spatial footwear fitting, explicit review boundaries, and same-input quantitative comparisons. These are local demonstrations of constrained transfer, not claims of universal automation or a new skinning decomposition.
+
+Section~\ref{sec:cap} separately extends this core formulation to a deployment with a total influence cap. It preserves an unlimited path, identifies conflicts between cardinality and fixed contributions, and evaluates the cost of bounded support selection. Approximation of individual dynamic weights is an explicit, default-off option rather than a change to the core conservation contract.
+
+
+
 \section{Related Work and Scope}
 \paragraph{Skinning decomposition.}
-Smooth Skinning Decomposition with Rigid Bones (SSDR) estimates rigid transformations and a sparse convex weight map from example deformations through alternating optimization~\cite{ssdr}. SBCST addresses a different setting: both rigs and their sampled transformations are given. We adapt existing weights under semantic equality constraints, without recovering a skeleton, alternating over bone transformations, or enforcing SSDR's bone-count sparsity model. The shared least-squares structure should not be interpreted as equivalent objectives or comparable benchmark results.
+Smooth Skinning Decomposition with Rigid Bones (SSDR) estimates rigid transformations and a sparse convex weight map from example deformations through alternating optimization~\cite{ssdr}. SBCST addresses a different setting: both rigs and their sampled transformations are given. We adapt existing weights under semantic equality constraints, without recovering a skeleton or alternating over bone transformations. The optional support cap in Section~\ref{sec:cap} restricts recipients on an existing rig; it does not reproduce SSDR's decomposition problem. The shared least-squares structure should not be interpreted as equivalent objectives or comparable benchmark results.
 
 \paragraph{Smooth influence fields.}
 Bounded biharmonic weights construct smooth, bounded influence fields through a variational formulation~\cite{bbw}. This motivates the value of geometry-aware regularity, but our footwear solver operates on a surface adjacency graph initialized by native surface transfer. It does not solve a volumetric biharmonic problem. Regularity and semantic allocation are complementary: smoothing an unconstrained field cannot determine whether a nearby sleeve bone is appropriate for a collar.
@@ -296,9 +301,11 @@ The solver's success flag is not the writeback decision. Validation checks budge
 An Agent can inspect bone roles, source following patterns, maps, scopes, and candidate support; suggest poses; and analyze ambiguous vertices. It should use the shared deterministic backend for known modes. Unsupported mixtures require explicit local reasoning or human treatment. The Agent's role is to resolve semantics and configure evidence, while mathematical conservation and independent tests enforce the contract. A statistical suggestion or a natural-language assurance cannot substitute for those checks.
 
 \paragraph{Computational structure.}
-For $N_f$ free vertex-bone weights and $P$ sampled poses, each free weight contributes at most three entries per pose to the data design, giving $O(PN_f)$ stored data coefficients. The graph adds entries only along selected edges and shared candidate dimensions. Vertices are coupled by graph regularization and barycentric contact samples; the method is not an independent regression at each vertex. Sparse factorization cost depends on this coupling and fill-in. We do not extrapolate runtime from variable count or claim a measured speed advantage.
+For $N_f$ free vertex-bone weights and $P$ sampled poses, each free weight contributes at most three entries per pose to the data design, giving $O(PN_f)$ stored data coefficients. The graph adds entries only along selected edges and shared candidate dimensions. Vertices are coupled by graph regularization and barycentric contact samples; the method is not an independent regression at each vertex. Sparse factorization cost depends on this coupling and fill-in. Section~\ref{sec:cap} measures the additional cost of support selection on two inputs; it does not establish a scaling law or a speed advantage over other methods.
 
 \section{Experiments}
+\label{sec:denseexperiments}
+All measurements in this section concern the historical unlimited method. The later total-influence deployment study is reported separately in Section~\ref{sec:cap}; it does not replace these baselines.
 \label{sec:experiments}
 We report local case studies measured in Blender 5.2 and archived before paper preparation. The general formulation is independent of avatar naming conventions. To identify evidence sources, the jacket archive uses a VRC-style source rig, the skirt-outfit archive uses an MMD-style rig, and both target a more segmented character rig. These are two source conventions, not a population-level generalization benchmark. A separate complex flat-shoe case tests the spatial branch.
 
@@ -412,6 +419,112 @@ The same-input baselines were generated in separate background Blender processes
 
 The repository publishes numerical extracts, baseline definitions, scope sizes, pose identifiers, and local measurement hashes~\cite{artifact}. Figure and table generation reads these extracts directly. Private third-party meshes and complete scene archives are not redistributed, so the public artifact reproduces the reported presentation and arithmetic, not an independently runnable asset benchmark. Measurements describe archived runs; they are not fresh benchmarks of every subsequent UI or preset change. Runtime scaling, parameter sensitivity, and cross-method comparisons are left for a broader evaluation.
 
+\section{Deployment Extension: Total Influence Constraints}
+\label{sec:cap}
+Semantic allocation and deployment cardinality are different constraints. A vertex can conserve every category while requiring more bone weights than a target permits. We therefore add an optional total-support policy to SBCST, while retaining the dense method as a separate mode. The implementation admits four or unlimited influences; this is a target-configuration choice, not a universal limit inferred from an engine version. This section supplements the core method and has its own empirical scope.
+
+\subsection{Cardinality and feasibility}
+For a requested cap $c_{\max}$, introduce binary support indicators:
+\begin{equation}
+ 0\leq w_{ij}\leq\zeta_{ij},\quad
+ \zeta_{ij}\in\{0,1\},\quad
+ \sum_j\zeta_{ij}\leq c_{\max}.
+ \label{eq:cap}
+\end{equation}
+All positive body, dynamic, and enabled finger weights count together. An ancestor without its own positive weight consumes no slot. The implementation counts strictly positive entries, including a float32 representation audit, rather than dropping small budgets by an unreported threshold.
+
+Let $\mathcal P_i^+=\{j\in\mathcal P_i:f_{ij}>0\}$ and use the residual budgets of Equation~\eqref{eq:residualbudget}. A necessary number of slots is
+\begin{equation}
+ n_i^{\min}=|\mathcal P_i^+|+
+       \sum_r\mathbf{1}[\beta_{ir}>0].
+ \label{eq:slotbound}
+\end{equation}
+Each positive residual category needs a distinct free recipient. A category already covered entirely by a fixed finger needs no additional slot. Consequently, $n_i^{\min}>c_{\max}$ proves infeasibility under exact fixed contributions. The converse does not hold: candidate admission, local correction bounds, or contacts can still be incompatible. Small positive categories cannot be discarded to make the bound pass.
+
+Equations~\eqref{eq:conserve} and~\eqref{eq:cap} define a combinatorial feasible set. We do not solve the full mixed-integer problem. Instead, bounded discrete support selection precedes the existing coupled continuous solve. The current cap is $c_{\max}=4$; a configuration value of zero means the cardinality constraint is omitted, not that zero bones are allowed.
+
+\subsection{Support selection and a fixed-support QP}
+Initialization retains dense weights $W^{\mathrm{dense}}$ and constructs a budget-feasible sparse seed wherever possible. Dynamic approximation is not performed at this initial stage. The outer search removes body candidates and tests one-bone exchanges, with at most 64 exchange evaluations per vertex. A local fit ranks supports using training response and a prior, respecting residual sums and correction bounds. It does not include the full coupled graph/contact objective, and held-out poses never enter ranking.
+
+After selecting support $\mathcal S$, OSQP fits its free weights jointly with the original constraints. Three quantities remain distinct: the dense anchor, the feasible sparse seed, and the actual stage input that defines local bounds. For an edge $(i,k)$, a correction residual is
+\begin{equation}
+ (w_{ij}-w^{\mathrm{dense}}_{ij})-
+ (w_{kj}-w^{\mathrm{dense}}_{kj}).
+ \label{eq:capgraph}
+\end{equation}
+When an influence is removed, its weight is zero but its negative dense-anchor contribution remains in this residual. Omitting that constant changes the graph objective, particularly at support and scope boundaries. The solve therefore retains those constants; it does not substitute the sparse seed for the dense prior. Local limits retain the form
+\begin{equation}
+ |w_{ij}-w^{\mathrm{input}}_{ij}|\leq\Delta_i.
+ \label{eq:capbounds}
+\end{equation}
+Fixed-support subproblems remain convex; support search does not have a global optimality certificate. If continuous/contact solving fails for the chosen support, the candidate is rejected. Automatic contact-driven combinatorial retries are not implemented. A final top-four truncation would instead bypass these budgets, constants, bounds, and pose tests.
+
+Unresolved vertices form an explicit set $\mathcal X$. Their entire input rows are preserved, while feasible rows may proceed:
+\begin{equation}
+ w_i=w_i^{\mathrm{input}}\ (i\in\mathcal X),\qquad
+ \|w_i\|_0\leq c_{\max}\ (i\notin\mathcal X).
+ \label{eq:capexceptions}
+\end{equation}
+Such an exception-preserving result is not globally cap-feasible if any unchanged row exceeds the limit. Whole-mesh counting includes pure dynamics and immutable exterior vertices. The artifact reports either strict four compatibility or unresolved runtime review, independently of motion/contact acceptance. A contact exemption cannot waive cardinality.
+
+Terminal refinement repeats support selection within its selected core and transition bounds, freezes the exterior, and rechecks macro holdouts. The shoe branch retains its spatial objective: field A selects support on the final body-plus-dynamic weights and reruns graph continuity within that mask; refinement B preserves the mask during projection. No shoe cap accuracy result is inferred from the garment study below.
+
+\begin{table*}[t]
+\centering\small
+\caption{Same-input macro timing, in seconds. Three serial repeats per mode with rotated order, Python 3.12 on Windows 11, and identical single-thread BLAS settings. Ranges are observed extrema, not confidence intervals. Timers include support selection and contact queries, excluding shared preparation, transfer, scene sampling, I/O, and validation. Legacy is the pre-cap solver; Four receives the same dense initial weights in this isolated ablation.}
+\label{tab:captime}
+\begin{tabular}{llrrrr}\toprule
+Case & Mode & Median & Range & Change vs. legacy & Support search\\\midrule
+\InfluenceTimingRows
+\bottomrule\end{tabular}
+\end{table*}
+
+\begin{table*}[t]
+\centering\small
+\caption{Held-out response in the complete numeric deployment workflow. RMS, P95, and maximum distances are multiplied by $10^3$ in scene units, not assumed millimetres. Dense is the identical legacy/unlimited result. Four includes sparse initialization with a retained dense prior, then macro and terminal fitting. Each stage has its own evaluation scope and poses.}
+\label{tab:capresponse}
+\begin{tabular}{llrrrr}\toprule
+Case / scope & Mode & Vertices & RMS & P95 & Maximum\\\midrule
+\InfluenceResponseRows
+\bottomrule\end{tabular}
+\end{table*}
+
+\subsection{Optional approximation of dynamic contributions}
+The default keeps every dynamic and enabled finger weight fixed. Only a vertex with a fixed-slot conflict can enter the optional dynamic approximation path. It preserves the dynamic total and uses a subset of the vertex's original dynamic recipients:
+\begin{equation}
+ \sum_{j\in\dyn}\widetilde w_{ij}=b_{i,\dyn},\qquad
+ \widetilde w_{ij}>0\ \Rightarrow\ w^{\mathrm{input}}_{ij}>0.
+ \label{eq:dynamiccap}
+\end{equation}
+Enabled fingers and all category budgets remain unchanged. Up to 64 dynamic subsets are tested; each retains the original relative proportions within the chosen subset and rescales to its original total. Thus individual dynamic invariance is relaxed explicitly, rather than silently normalizing all groups.
+
+Training probes rotate each retained dynamic bone by $12^\circ$ about local X/Y/Z; independent probes use $-7^\circ$. Blender samples descendants and checks numerical LBS against evaluated geometry. A dynamic subtree containing body-weighted descendants is rejected. For garment span $d$, validation requires
+\begin{equation}
+ \max_{p\in\mathcal H_{\dyn}}
+ \frac{\left\|\sum_{j\in\dyn}
+ (\widetilde w_{ij}-w^{\mathrm{input}}_{ij})a_{ij}^p\right\|}{d}
+ \leq\tau_{\dyn}.
+ \label{eq:dynamicprobe}
+\end{equation}
+The default $\tau_{\dyn}=0.002$ is an implementation tolerance, not a calibrated perceptual threshold. Separate scoped contact tests are also required. Failed garment candidates are rejected; shoes may restore failed rows as unchanged exceptions. These probes do not reconstruct inertia, damping, or arbitrary physics trajectories. Dynamic approximation is disabled in all measurements that follow.
+
+\subsection{Controlled deployment study}
+Two archived jackets have 8,885/8,969 vertices and 47/78 target bone columns. We freeze paired geometry, matrices, budgets, candidates, references, contact samples, and parameters. Macro fitting uses 12 training poses and 3 holdouts; terminal fitting uses 15 training poses and 4 holdouts, on 1,514/1,562 vertices. Macro prior/graph coefficients are both 0.002, trust is 0.15, and at most four contact iterations are allowed. Terminal prior/graph coefficients are 0.00005/0.00003, residual scale is 0.15, trust is 0.35, and at most eight iterations are allowed. Archive digests and Blender/LBS agreement are verified.
+
+
+
+The pre-cap solver at commit \texttt{ccdadc0} and the new unlimited path produce exactly equal weights, including the chained terminal result. Their median macro timing differences are 1.64\% and 0.28\%, within observed repeat ranges. The isolated four-mode macro solves cost 79.45\% and 101.92\% more (Table~\ref{tab:captime}); support selection contributes median 19.91 and 25.06 seconds. Repeated outputs are identical in each mode. These are two local timings, not a complexity-scaling or engine frame-rate experiment.
+
+
+
+A separate UI-like numerical path includes initialization support selection and passes each macro output into terminal refinement. Single-run totals are 53.45/64.65 seconds, versus 37.39/36.87 seconds for legacy macro-plus-terminal. These totals are not the repeated dense-input ablation. They reuse archived matrices and omit intermediate Blender float32 writeback; no production scene or Unity asset is modified.
+
+Table~\ref{tab:capresponse} exposes the fidelity tradeoff. Macro RMS decreases 0.56\%/1.75\%, but maximum error increases 0.48\%/1.53\%. Closed terminal RMS decreases 67.05\%; open terminal RMS increases \textbf{8.68\%}, with P95 up 11.48\% and essentially unchanged maximum. The isolated dense-input four path gives a slightly different open terminal RMS increase (9.17\%). Initialization and bounded search therefore matter. A smaller support can improve some local responses without providing a general improvement or an unavoidable-error bound.
+
+Both four-mode results retain fixed and dynamic weights exactly, with maximum budget error $3.99\times10^{-8}$. The closed jacket satisfies four slots throughout. The open jacket preserves \textbf{140 over-limit vertices}, with maximum support nine, because Equation~\eqref{eq:slotbound} exceeds four. It remains an exception-preserving result, not a strict four-compatible asset.
+
+Independent Blender 5.2 checks find zero in-scope triangle crossings or penetrating samples on each final result's three macro and four terminal holdouts. The scope includes body-influenced vertices and boundary faces, with tolerance $10^{-4}$ and no additional body-vertex exemption mask; pure dynamics remain outside body-fitting acceptance. Budget compatibility, sampled contact results, and engine compatibility are separate claims. This study does not evaluate optional dynamic compression, shoe/MMD cap accuracy, unsampled motion, or Unity import/runtime behavior. Public extracts and table-generation code accompany the artifact~\cite{artifact}.
+
 \section{Discussion and Limitations}
 \paragraph{Why budgets are useful.}
 Budget conservation turns an ambiguous nearest-surface choice into a restricted allocation problem. It is particularly effective when the source clearly excludes a category, as with a torso-only collar close to an arm. It also preserves mixed body/dynamic attachments that would be erased by deleting all body weights in dynamic regions. The method preserves source intent only to the extent that the source weights and reviewed roles encode that intent correctly.
@@ -426,16 +539,14 @@ Paired garment vertices are required for motion transport. Remeshing without cor
 Explicit exception masks are useful for garments with known authored intersections and unadjustable fixed regions. They allow useful optimization and targeted validation to continue while keeping those limitations inspectable. Robust handling of such inputs should be distinguished from proving collision freedom. A claim of a strict pass must identify its pose set, sample set, mask, and tolerances. Neither the contact linearization nor an exception-reviewed historical case certifies all unsampled poses, self-collisions, other clothing layers, or body-shape edits.
 
 \paragraph{Optimization scope and identifiability.}
-The method fits body weights under fixed transforms; it does not recover physical dynamics. Pure-dynamic regions are intentionally outside body fitting. Strong conservation can leave too few degrees of freedom to satisfy a contact inequality. The regularized QP can choose a unique solution even when data alone are insufficient, so uniqueness does not establish physical correctness. The present implementation also does not promise a maximum number of influences per vertex. Later pruning or export constraints require revalidation.
+The method fits body weights under fixed transforms; it does not recover physical dynamics. Pure-dynamic regions are intentionally outside body fitting. Strong conservation can leave too few degrees of freedom to satisfy a contact inequality. The regularized QP can choose a unique solution even when data alone are insufficient, so uniqueness does not establish physical correctness. Section~\ref{sec:cap} adds a selectable count limit, but bounded support search can leave explicit exceptions and does not prove global sparse optimality. Later pruning or engine-side reduction still requires revalidation.
 
 \paragraph{Evaluation coverage.}
 The reported evidence includes two garment conventions and one shoe pair. The initial cross-rig study supports feasibility, while a larger asset collection is needed to characterize generalization. Random auxiliary poses are implemented as a sampling extension, but their benefit awaits a dedicated ablation. Further experiments should isolate confidence fallback, semantic mappings, local transport, graph regularization, and terminal sampling, and report both motion and contact outcomes with complete configurations.
 
 \section{Conclusion}
-SBCST preserves per-vertex semantic influence allocation while adapting its within-category distribution to a new character. Native surface transfer remains useful, but is constrained by source ownership, fixed clothing dynamics, admitted body support, and reviewed finger policies. Proportion-aware motion fitting, local terminal refinement, and an alternative footwear separation objective share this contract. Local studies show exact exclusion of measured wrong-category influence within writeback tolerance and task-dependent improvements in held-out response. Explicit contact scopes allow authored limitations to be handled locally and transparently. The framework provides a practical basis for broader garment-retargeting evaluation without conflating semantic conservation, motion similarity, and collision guarantees.
+SBCST preserves per-vertex semantic influence allocation while adapting its within-category distribution to a new character. Native surface transfer remains useful, but is constrained by source ownership, fixed clothing dynamics, admitted body support, and reviewed finger policies. Proportion-aware motion fitting, local terminal refinement, and an alternative footwear separation objective share this contract. Local studies show exact exclusion of measured wrong-category influence within writeback tolerance and task-dependent improvements in held-out response. Explicit contact scopes allow authored limitations to be handled locally and transparently. An optional deployment extension adds bounded support selection while preserving the unlimited baseline; its measured cost, local fidelity tradeoffs, and unresolved rows remain explicit. The framework separates semantic conservation, motion similarity, sampled contact evidence, and runtime compatibility.
 
-% Start the final artifact/disclosure column after the conclusion.
-\newpage
 \paragraph{Availability and disclosure.}
 Code, LaTeX source, measurement summaries, and build instructions are available in the project repository~\cite{artifact}. This is an independent technical manuscript, not a peer-reviewed publication. Implementation and manuscript preparation used AI-assisted development with human direction and review. Third-party assets retain their own rights and are not included in the paper artifact. The accompanying software is licensed under AGPL-3.0-only; see the repository for scope and notices.
 
@@ -444,6 +555,6 @@ Code, LaTeX source, measurement summaries, and build instructions are available 
 \bibitem{bbw} Alec Jacobson, Ilya Baran, Jovan Popovi\'{c}, and Olga Sorkine. 2011. Bounded Biharmonic Weights for Real-Time Deformation. \emph{ACM Transactions on Graphics} 30, 4. \url{https://igl.ethz.ch/projects/bbw/}.
 \bibitem{blender} Blender Foundation. Data Transfer Modifier. \emph{Blender Manual}. \url{https://docs.blender.org/manual/en/latest/modeling/modifiers/modify/data_transfer.html}. Accessed September 2026.
 \bibitem{osqp} OSQP Developers. The Solver. \emph{OSQP Documentation}. \url{https://osqp.org/docs/solver/index.html}. Accessed September 2026.
-\bibitem{artifact} tomTomIEE. 2026. KK Modder BatchTool: SBCST implementation and measurement artifacts. \url{https://github.com/tomTom1010-IEE/KK_Modder-BatchTool}. Measurement snapshot: September 21, 2026.
+\bibitem{artifact} tomTomIEE. 2026. KK Modder BatchTool: SBCST implementation and measurement artifacts. \url{https://github.com/tomTom1010-IEE/KK_Modder-BatchTool}. Core measurements: September 21, 2026; deployment extension: September 28, 2026.
 \end{thebibliography}
 \end{document}

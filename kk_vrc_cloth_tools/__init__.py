@@ -4,7 +4,7 @@
 bl_info = {
     "name": "KK/VRC Cloth Tools",
     "author": "tomTomIEE + Codex",
-    "version": (0, 2, 26),
+    "version": (0, 3, 0),
     "blender": (4, 3, 0),
     "location": "View3D > Sidebar > KK/VRC Tools / model preprocess / mannual edit / config",
     "description": "Batch tools for grafting VRC clothing bones and remapping weights to Koikatsu armatures.",
@@ -13,9 +13,11 @@ bl_info = {
 
 if "bpy" in locals():
     import importlib
+    from . import bone_names, bone_names_ui
     from . import common
     from . import bone_rules
     from . import vrc_bone_rules
+    from . import vrc_kk_mapping
     from . import graft
     from . import weights_body
     from . import weights_torso
@@ -38,20 +40,31 @@ if "bpy" in locals():
     from . import mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui
     from . import accessory_rules, accessory_preprocess, accessory_ui
 
+    importlib.reload(bone_names)
+    importlib.reload(bone_names_ui)
     solver_setup.shutdown()
     importlib.reload(solver_environment)
     importlib.reload(solver_setup)
     importlib.reload(ui_messages)
     importlib.reload(mmd_weight_profiles)
+    from . import influence_policy, influence_blender
+    importlib.reload(influence_policy)
+    if bpy.app.timers.is_registered(influence_blender.migrate_existing):
+        bpy.app.timers.unregister(influence_blender.migrate_existing)
+    if influence_blender.migrate_existing in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(influence_blender.migrate_existing)
+    importlib.reload(influence_blender)
 
-    for _module in (common, bone_rules, vrc_bone_rules, graft, weights_body, weights_torso, weights_breast, weights_transfer, weights_hybrid, weight_features, weights_features, optimizer_scope, weights_optimization, optimizer_validation, workflow_regions, workflow_presets, region_patterns, optimizer_profiles, workflow, workflow_beginner, shoe_field, shoe_presets, shoe_workflow, shoe_ui, glove_align, bone_cleanup, topology_export, translations, ui, export_cleanup, mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui):
+    for _module in (common, bone_rules, vrc_bone_rules, vrc_kk_mapping, graft, weights_body, weights_torso, weights_breast, weights_transfer, weights_hybrid, weight_features, weights_features, optimizer_scope, weights_optimization, optimizer_validation, workflow_regions, workflow_presets, region_patterns, optimizer_profiles, workflow, workflow_beginner, shoe_field, shoe_presets, shoe_workflow, shoe_ui, glove_align, bone_cleanup, topology_export, translations, ui, export_cleanup, mmd_preprocess_rules, mmd_preprocess, mmd_preprocess_ui):
         importlib.reload(_module)
     for _module in (accessory_rules,accessory_preprocess,accessory_ui):
         importlib.reload(_module)
 else:
+    from . import bone_names, bone_names_ui
     from . import common
     from . import bone_rules
     from . import vrc_bone_rules
+    from . import vrc_kk_mapping
     from . import graft
     from . import weights_body
     from . import weights_torso
@@ -74,9 +87,12 @@ else:
     from . import accessory_rules, accessory_preprocess, accessory_ui
 
 import bpy
+from . import influence_blender
 
 
 CLASSES = (
+    *bone_names_ui.CLASSES,
+    *influence_blender.CLASSES,
     *solver_setup.CLASSES,
     *accessory_ui.CLASSES,
     *mmd_preprocess_ui.CLASSES,
@@ -112,6 +128,7 @@ CLASSES = (
 
 
 def register():
+    bone_names_ui.register_property()
     bpy.app.translations.register(__name__, translations.TRANSLATIONS)
     for cls in CLASSES:
         bpy.utils.register_class(cls)
@@ -121,10 +138,27 @@ def register():
     bpy.types.Scene.kkvrc_cloth_tools = bpy.props.PointerProperty(type=ui.KKVRC_ClothToolsProperties)
     bpy.types.Scene.kkvrc_weight_workflow = bpy.props.PointerProperty(type=workflow.KKVRC_WorkflowProperties)
     bpy.types.Scene.kkvrc_shoes = bpy.props.PointerProperty(type=shoe_ui.KKVRC_ShoeSettings)
+    from . import influence_blender
+    # addon_utils enables add-ons inside RestrictBlend: scene access becomes
+    # available only after registration returns. Direct/script registration can
+    # migrate immediately, preserving the existing non-UI API contract.
+    if hasattr(bpy.data, 'scenes'):
+        influence_blender.migrate_existing()
+    else:
+        bpy.app.timers.register(influence_blender.migrate_existing, first_interval=0.0)
+    if influence_blender.migrate_existing not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(influence_blender.migrate_existing)
 
     bpy.app.timers.register(solver_setup.automatic_check, first_interval=1.0)
 
 def unregister():
+    if hasattr(bpy.types.Scene, 'kkvrc_bone_name_mode'):
+        del bpy.types.Scene.kkvrc_bone_name_mode
+    from . import influence_blender
+    if bpy.app.timers.is_registered(influence_blender.migrate_existing):
+        bpy.app.timers.unregister(influence_blender.migrate_existing)
+    if influence_blender.migrate_existing in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(influence_blender.migrate_existing)
     solver_setup.shutdown()
     workflow.stop_jobs()
     if hasattr(bpy.types.Scene,'kkvrc_accessory'):

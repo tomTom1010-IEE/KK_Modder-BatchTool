@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from .mmd_preprocess_rules import canonical
 from .weight_features import digest
+from . import bone_names
 
 def load(profile='MMD', asset_path=''):
     repo=Path(__file__).resolve().parent.parent/'bone_profiles'
@@ -21,14 +22,17 @@ def load(profile='MMD', asset_path=''):
 
 def recognize(records, conventions, asset=None):
     entries={canonical(n):v for n,v in conventions['entries'].items()}
+    # Resolve only against maintained entries; Japanese names without a suffix
+    # retain their existing exact/name_j semantics.
+    def spelling(n):return bone_names.canonical(canonical(n),entries)
     aliases={}
     for b in records:
-        for n in {canonical(b['name']),canonical(b.get('name_j',''))}- {''}:
+        for n in {spelling(b['name']),spelling(b.get('name_j',''))}- {''}:
             aliases.setdefault(n,set()).add(b['name'])
     historical={b['name']:b for b in (asset or {}).get('bones',[])}
     result={}
     for b in records:
-        keys={canonical(b['name']),canonical(b.get('name_j',''))}-{''}
+        keys={spelling(b['name']),spelling(b.get('name_j',''))}-{''}
         matches={k for k in keys if k in entries}
         collision=any(len(aliases[k])>1 for k in keys)
         info={'role':'REVIEW','reason':'Unknown or needs asset ownership review'}
@@ -39,10 +43,10 @@ def recognize(records, conventions, asset=None):
             info.update(entry)
             if entry['kind'] in {'BODY','BODY_SUPPORT','FINGER'} and entry.get('budget_region'):
                 info['role']='BODY';info['reason']='Maintained convention candidate; review mappings and hierarchy'
-        historical_bone=historical.get(b['name'])
+        historical_bone=bone_names.lookup(historical,b['name'])
         if historical_bone:
             info['asset_evidence']={'candidate_kind':historical_bone['candidate_kind'],
-                'same_parent':historical_bone.get('parent')==b.get('parent'),
+                'same_parent':historical_bone.get('parent')==bone_names.canonical(b.get('parent'),historical),
                 'issues':historical_bone.get('issues',[])}
         result[b['name']]=info
     return result

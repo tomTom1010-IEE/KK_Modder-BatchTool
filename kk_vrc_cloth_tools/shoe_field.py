@@ -19,7 +19,7 @@ def simplex(x, allowed=None):
     return np.maximum(x - theta[:, None], 0)
 
 
-def smooth(initial, edges, confidence, strength=1., iterations=300, tolerance=1e-7, allowed=None):
+def smooth(initial, edges, confidence, strength=1., iterations=300, tolerance=1e-7, allowed=None, fixed_rows=None):
     """Convex graph/data energy, positive conductances, no cross-layer KNN.
 
 Convex-combination Jacobi updates preserve simplex constraints exactly. Isolated
@@ -39,13 +39,14 @@ components still have positive data anchors; no global constant-field nullspace.
         np.add.at(accum, a, p[b]); np.add.at(accum, b, p[a])
         new = (c[:, None]*initial + strength*accum)/(c+strength*degree)[:, None]
         if allowed is not None:new=simplex(new,allowed)
+        if fixed_rows is not None:new[fixed_rows]=initial[fixed_rows]
         delta = float(np.max(abs(new-p))); p = new
         if delta < tolerance: break
     return p, {'iterations':step+1, 'max_delta':delta, 'converged':delta<tolerance}
 
 
 def optimize(initial, H, rhs, edges, prior=0.05, smoothness=0.02,
-             iterations=600, tolerance=2e-7, allowed=None):
+             iterations=600, tolerance=2e-7, allowed=None, fixed_rows=None):
     """Projected gradient on a convex fixed-reference gap/offset quadratic.
 
 H/rhs include pose terms. Bound step size uses a safe symmetric row-sum bound.
@@ -63,6 +64,7 @@ This is not a nonlinear closest-surface or collision certificate.
         np.add.at(lap,a,-p[b]);np.add.at(lap,b,-p[a])
         grad = np.einsum('vij,vj->vi',H,p)-rhs+smoothness*lap
         new = simplex(p-grad/bound,allowed)
+        if fixed_rows is not None:new[fixed_rows]=initial[fixed_rows]
         delta = float(np.max(abs(new-p)));p=new
         if delta<tolerance:break
     return p, {'iterations':step+1,'max_delta':delta,'converged':delta<tolerance,

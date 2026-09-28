@@ -32,6 +32,7 @@ for name in ['Spine','Chest','Neck','Upper_arm.L','Upper_arm.R','Lower_arm.L','L
 x=p.bones.add();x.name='Cloth';x.role='REVIEW'
 x=p.targets.add();x.name='Chest';x.region='TORSO';x.reviewed=True
 p.output=tempfile.mkdtemp(prefix='kkvrc-beginner-');p.python=os.environ['KKVRC_TEST_PYTHON']
+p.dependencies=os.environ.get('KKVRC_TEST_DEPENDENCIES','')
 before={o.name:w.wf.stamp(o) for o in [p.source,p.target,p.body]}
 b.apply_preset(p)
 assert not p.contacts and p.collision_policy=='REVIEW' and p.initial_mode=='NATIVE' and len(p.motions)==9

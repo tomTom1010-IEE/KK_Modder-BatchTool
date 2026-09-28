@@ -1,4 +1,5 @@
 """Export cleanup using the finite KK body-bone set and whole non-body subtrees."""
+from . import bone_names
 import json
 from .ui_messages import format_message as _fmt
 import bpy
@@ -6,10 +7,11 @@ from . import bone_cleanup, bone_rules
 
 
 def discover_roots(armature):
+    bone_names.assert_unique(armature.data.bones.keys())
     # A branch under a non-body bone belongs to that same indivisible chain.
     return sorted(b.name for b in armature.data.bones
-                  if not bone_rules.is_kk_standard_body_bone(b.name)
-                  and (b.parent is None or bone_rules.is_kk_standard_body_bone(b.parent.name)))
+                  if not bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', b.name)
+                  and (b.parent is None or bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', b.parent.name)))
 
 
 def selected_armature(context):
@@ -93,7 +95,7 @@ def plan(armature, roots=None):
         reasons = set(global_reasons)
         if chain & weighted:
             reasons.add('Chain has actual weights (preserve the entire chain and tips)')
-        if any(bone_rules.is_kk_standard_body_bone(n) for n in chain):
+        if any(bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', n) for n in chain):
             reasons.add('Contains known body bones; automatic removal is prohibited')
         reasons.update(protected[n] for n in chain if n in protected)
         rows.append({'root': root, 'bones': sorted(chain), 'reason': '；'.join(sorted(reasons)), 'eligible': not reasons})

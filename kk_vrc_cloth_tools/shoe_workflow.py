@@ -27,6 +27,53 @@ def remove_temp(obj):
     if not mesh.users:bpy.data.meshes.remove(mesh)
 
 
+def constrain_field(output,names,config,contexts,baseline,body,xyz,ct,bt):
+    from .influence_policy import policy,select,validate_result,audit
+    p=policy(config.get('influence_policy'))
+    if not p['max_influences']:return output,audit(output,p)
+    dynamic={n for side in config['sides'] for n in side['dynamic']}
+    region_map={n:(3 if side['name']=='L' else 4) for side in config['sides'] for n in side['target_body']}
+    regions=np.array([5 if n in dynamic else region_map[n] for n in names])
+    fixed=np.broadcast_to(regions==5,output.shape).copy();allowed=output>0
+    budgets=np.stack([output[:,regions==r].sum(1) for r in range(6)],axis=1)
+    for ctx in contexts:allowed[np.ix_(ctx['ids'],ctx['j'])]=ctx['allowed']
+    probes={};scale=max(float(np.linalg.norm(np.ptp(xyz,axis=0))),1e-6)
+    if p['compress_dynamic']:
+        from .influence_blender import sample_dynamic_probes
+        probes,scale=sample_dynamic_probes(baseline,body,names,dynamic)
+    seed,support,report=select(output,regions,budgets,fixed,allowed,p,rest=xyz,
+        dynamic_train=probes.get('dynamic_train'),dynamic_scale=scale)
+    compressed=report['compressed_vertices']
+    if compressed:
+        verdict=validate_result(output,seed,regions,budgets,fixed,allowed,p,rest=xyz,
+            dynamic_holdout=probes.get('dynamic_holdout'),dynamic_scale=scale)
+        excluded=np.ones(len(seed),bool);excluded[compressed]=False
+        contact_ok=True;body_rest=kin._world_vertices(body)
+        for mats in probes['dynamic_holdout']:
+            basis=np.einsum('bij,vj->vbi',mats[:,:3,:3],xyz)+mats[None,:,:3,3]
+            col=check_surface(np.einsum('vb,vbc->vc',seed,basis),ct,body_rest,bt,excluded=excluded)['in_scope']
+            contact_ok &= all(col[k]==0 for k in ('intersecting_triangle_pairs','penetrating_samples','ambiguous_coplanar_pairs'))
+        report['dynamic_validation']=dict(verdict,contact_ok=bool(contact_ok))
+        if not verdict['constraints_ok'] or not contact_ok:
+            # Safety fallback to the uncompressed reference; never train on holdout.
+            seed[compressed]=output[compressed];support[compressed]=output[compressed]>0
+            report['exceptions'].extend(dict(vertex=int(i),reason='dynamic_independent_validation_failed') for i in compressed)
+            report['compressed_vertices']=[]
+    exceptions={item['vertex'] for item in report['exceptions']}
+    for ctx in contexts:
+        ids,j=ctx['ids'],ctx['j'];ctx['dense_p']=ctx['p'].copy()
+        ctx['allowed']=support[np.ix_(ids,j)]
+        ctx['fixed_rows']=np.array([i in exceptions for i in ids])
+        # Continuity iterations remain on the chosen support and freeze exceptions.
+        pp,rep=field.smooth(ctx['p'],ctx['edges'],ctx['confidence'],config.get('smoothing',.7),
+                            iterations=1000,allowed=ctx['allowed'],fixed_rows=ctx['fixed_rows'])
+        if not rep['converged']:raise ValueError('Support-constrained shoe field did not converge')
+        seed[np.ix_(ids,j)]=pp*ctx['budget'][:,None];ctx['p']=pp
+    report.update(audit(seed,p))
+    if not np.array_equal(seed[list(exceptions)],output[list(exceptions)]):raise ValueError('Shoe exception changed')
+    return seed,report
+
+
 def write(obj,names,w):
     if any(g.lock_weight for g in obj.vertex_groups):raise ValueError('Locked groups')
     if not np.isfinite(w).all() or np.min(w)<-1e-9 or np.max(abs(w.sum(1)-1))>1e-6:
@@ -180,6 +227,14 @@ Reviewed masks are exact source indices. Unknown source groups/overlaps abort.
     finally:remove_temp(probe);remove_temp(tempbody)
     if np.max(abs(output.sum(1)-1))>1e-6:raise ValueError('Source budget coverage mismatch')
     baseline=clone(target,config.get('prefix','Shoes.Flat')+'.A.Field');write(baseline,names,output)
+    dense_output=output.copy()
+    try:
+        output,support_report=constrain_field(output,names,config,contexts,baseline,body,xyz,ct,bt)
+        write(baseline,names,output)
+    except Exception:
+        remove_temp(baseline);raise
+    save('influence-support.json',support_report)
+    np.savez_compressed(directory/'dense-reference.npz',weights=dense_output,names=names)
     baseline.hide_set(False)
     np.savez_compressed(directory/'initial.npz',weights=output,names=names)
     checkpoint={"config":config,"names":names,"audit":audit,"stamps":stamps,
@@ -193,6 +248,7 @@ Reviewed masks are exact source indices. Unknown source groups/overlaps abort.
     save('field-context.json',checkpoint)
     if field_only:
         report={'baseline':baseline.name,'optimized':None,'accepted':False,'stage':'FIELD',
+                'influence_support':support_report,
                 'field':audit,'protected_unchanged':all(wf.stamp(bpy.data.objects[n])==v for n,v in stamps.items())}
         if not report['protected_unchanged']:raise ValueError('Protected state changed')
         save('report.json',report);progress('field complete');return report
@@ -257,7 +313,7 @@ def _finish(source,target,body,config,directory,baseline,output,names,xyz,bt,ct,
             confidence=1/(1+(ctx['dist']/ctx['scale'])**2)
             H+=np.einsum('vik,vil,i,v->vkl',D,D,axisw,confidence)
             rhs+=np.einsum('vik,vi,i,v->vk',D,y,axisw,confidence)
-        pp,rep=field.optimize(ctx['p'],H,rhs,ctx['edges'],prior=config.get('prior',.1),iterations=1500,allowed=ctx['allowed'])
+        pp,rep=field.optimize(ctx['p'],H,rhs,ctx['edges'],prior=config.get('prior',.1),iterations=1500,allowed=ctx['allowed'],fixed_rows=ctx.get('fixed_rows'))
         optimized[np.ix_(ids,j)]=pp*ctx['budget'][:,None];solver.append(rep)
     # Independent pose metrics use actual closest-surface distance and full faces.
     def metrics(w,records):
@@ -281,6 +337,12 @@ def _finish(source,target,body,config,directory,baseline,output,names,xyz,bt,ct,
             'optimize_gap':optimize_gap,
             'field':audit,'solver':solver,'lbs_error':max_lbs,'baseline_validation':ma,'optimized_validation':mb,
             'limitations':['Discrete poses only; no continuous collision guarantee','No shoe self-collision or other clothing collision','Fixed reference quadratic, not exact nonlinear distance minimization']}
+    from .influence_policy import audit as influence_audit
+    result['influence_support_A']=influence_audit(output,config.get('influence_policy'))
+    result['influence_support_B']=influence_audit(optimized,config.get('influence_policy'))
+    exception_ids=result['influence_support_A']['over_limit_vertices']
+    if result['influence_support_B']['over_limit_vertices']!=exception_ids or not np.array_equal(optimized[exception_ids],output[exception_ids]):
+        raise ValueError('Shoe refinement changed an unresolved support exception')
     if accepted:
         candidate=clone(target,config.get('prefix','Shoes.Flat')+'.B.Gap');write(candidate,names,optimized)
         # Actual Blender evaluation after float32 writeback, not just numerical LBS.
@@ -298,7 +360,7 @@ def _finish(source,target,body,config,directory,baseline,output,names,xyz,bt,ct,
     result['actual_writeback']={}
     for object_name in [baseline.name]+([result['optimized']] if result['optimized'] else []):
         obj=bpy.data.objects[object_name];actual=kin._dense(wf.read_weights(obj),names)
-        expected_dynamic={n:np.array([r.get(n,0) for r in rows])/total for side in config['sides'] for n in side['dynamic']}
+        expected_dynamic={n:output[:,names.index(n)] for side in config['sides'] for n in side['dynamic']}
         errors={'sum':float(np.max(abs(actual.sum(1)-1))),
                 'budget':max(float(np.max(abs(actual[:,[names.index(n) for n in side['target_body']]].sum(1)-bs))) for side,bs in zip(config['sides'],budgets)),
                 'dynamic':max(float(np.max(abs(actual[:,names.index(n)]-w))) for n,w in expected_dynamic.items()) if expected_dynamic else 0.,

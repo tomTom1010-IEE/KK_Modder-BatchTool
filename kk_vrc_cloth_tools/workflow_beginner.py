@@ -26,7 +26,7 @@ def apply_preset(p):
     # while preserving reviewed roles, regions, mappings and local masks.
     p.initial_mode='NATIVE';p.confidence=1.;p.contacts=p.collision_policy=='STRICT';p.rings=2;p.small_angle=8
     for x in p.bones:
-        if x.role=='BODY' and x.semantic=='NONE':x.semantic=w.vr.VRC_MOTION_SEMANTICS.get(x.name,'NONE')
+        if x.role=='BODY' and x.semantic=='NONE':x.semantic=w.names.lookup(w.vr.VRC_MOTION_SEMANTICS,x.name,'NONE')
     # Original finger design is retained by default, sampled fingers stay
     # excluded. Disabling fingers routes their budget to a known same-side hand.
     for x in p.bones:
@@ -35,8 +35,9 @@ def apply_preset(p):
         if p.beginner_fingers:
             x.enabled=True
             if w.finger_name(x.weight_target)!=x.finger:
-                mapped=w.weights_body.VRC_TO_KK_BODY_GROUPS.get(x.name)
-                if mapped and mapped in {t.name for t in p.targets}:x.weight_target=mapped
+                mapped=w.names.lookup(w.weights_body.VRC_TO_KK_BODY_GROUPS,x.name)
+                actual=w.names.resolve(mapped,{t.name for t in p.targets})
+                if actual:x.weight_target=actual
         else:
             hand=next((b for b in p.bones if b.role=='BODY' and b.semantic=='HAND_'+side and b.finger=='NONE'),None)
             if hand is None:raise ValueError(x.name+': no confirmed same-side hand mapping; cannot disable fingers automatically')
@@ -149,6 +150,7 @@ class KKVRC_PT_beginner_weights(bpy.types.Panel):
         layout.label(text='Unrecognized: agent analysis or manual handling required')
         layout.label(text='After highlighting, press Tab to return to Object Mode before solving')
         layout.label(text='Preview and restore poses in the detailed workflow below')
+        w.influence_blender.draw(layout,p)
         layout.operator('kkvrc.beginner_weights',text='3. Solve → validate → create copies').action='RUN'
         layout.label(text='Press Esc to cancel; results are saved as a separate blend file')
         row=layout.row(align=True);w.button(row,'Select collision vertices','REVIEW_CONTACTS');w.button(row,'Revert to previous version','ROLLBACK_RESULT')

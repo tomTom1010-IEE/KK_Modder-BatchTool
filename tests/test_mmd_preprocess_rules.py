@@ -3,8 +3,10 @@ from pathlib import Path
 import unittest
 
 path=Path(__file__).resolve().parents[1]/'kk_vrc_cloth_tools'/'mmd_preprocess_rules.py'
-spec=importlib.util.spec_from_file_location('mmd_rules',path)
-r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+import sys, types, importlib
+pkg=types.ModuleType('mmd_rules_tests');pkg.__path__=[str(path.parent)]
+sys.modules[pkg.__name__]=pkg
+r=importlib.import_module(pkg.__name__+'.mmd_preprocess_rules')
 
 
 def bone(name,parent=None,deps=()):

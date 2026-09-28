@@ -10,6 +10,8 @@ from . import shoe_workflow as engine, shoe_presets, vrc_bone_rules as vr
 from .workflow import target_region
 from .workflow_presets import discover_roots
 from .region_patterns import suggest_pattern
+from . import influence_blender
+from . import bone_names as names, bone_names_ui, bone_rules
 
 
 def mesh_poll(self,obj):return obj.type=='MESH'
@@ -45,6 +47,7 @@ class KKVRC_ShoeSide(bpy.types.PropertyGroup):
 
 
 class KKVRC_ShoeSettings(bpy.types.PropertyGroup):
+    __annotations__=influence_blender.properties()
     source:bpy.props.PointerProperty(name='Original shoes (complete source weights)',type=bpy.types.Object,poll=mesh_poll,update=invalidate)
     target:bpy.props.PointerProperty(name='Fitted shoes',type=bpy.types.Object,poll=mesh_poll,update=invalidate)
     body:bpy.props.PointerProperty(name='Target body',type=bpy.types.Object,poll=mesh_poll,update=invalidate)
@@ -101,6 +104,8 @@ def objects(p):
     if len({p.source,p.target,p.body})!=3:raise ValueError('The three inputs must be different objects')
     if bpy.context.mode!='OBJECT':raise ValueError('Switch to Object Mode first')
     sr,tr,br=[kin._rig(o) for o in [p.source,p.target,p.body]]
+    for arm in (sr,tr):names.assert_unique(arm.data.bones.keys())
+    for obj in (p.source,p.target,p.body):names.assert_unique(obj.vertex_groups.keys())
     if tr!=br or sr==tr:raise ValueError('Fitted shoes and body must share the target rig; original shoes require a separate source rig')
     if wf.topology(p.source)!=wf.topology(p.target):raise ValueError('Original and fitted shoe topology does not match')
     return sr,tr
@@ -114,7 +119,7 @@ def scan_roots(p):
     sr,_=objects(p);roles={x.name:x.role for x in p.source_bones}
     weighted={n for r in wf.read_weights(p.source) for n in r}
     parents={b.name:b.parent.name if b.parent else None for b in sr.data.bones}
-    known={n for n,v in vr.VRC_WEIGHT_POLICIES.items() if v.source_role=='BODY'}
+    known=names.matched(sr.data.bones.keys(),{n for n,v in vr.VRC_WEIGHT_POLICIES.items() if v.source_role=='BODY'})
     discovered=discover_roots(parents,roles,weighted,known)
     p.roots.clear();rows=wf.read_weights(p.source);edges=[tuple(e.vertices) for e in p.source.data.edges]
     body={n for n,r in roles.items() if r=='BODY'};dyn=weighted-body
@@ -139,7 +144,7 @@ def infer_directions(p):
         foot=rig.data.bones.get(side.foot);toes=rig.data.bones.get(side.toes)
         if not foot or not toes:raise ValueError('Foot motion bones not recognized; set them manually')
         forward=rig.matrix_world.to_3x3()@(toes.head_local-foot.head_local)
-        shin=rig.data.bones.get('cf_j_leg03_'+side.name)
+        shin=rig.data.bones.get(names.resolve('cf_j_leg03_'+side.name,rig.data.bones,default=''))
         if not shin:raise ValueError('Lower-leg reference bone not recognized; set directions manually')
         up=rig.matrix_world.to_3x3()@(shin.head_local-foot.head_local)
         if up.length<1e-8:raise ValueError('Lower-leg reference is too short; set directions manually')
@@ -150,19 +155,20 @@ def infer_directions(p):
 
 
 def scan(p):
+    influence_blender.settings(p)
     sr,tr=objects(p);p.source_bones.clear();p.target_bones.clear();p.sides.clear()
     for side in ['L','R']:
         s=p.sides.add();s.name=side
-        if f'cf_j_foot_{side}' in tr.data.bones:s.foot=f'cf_j_foot_{side}'
-        if f'cf_j_toes_{side}' in tr.data.bones:s.toes=f'cf_j_toes_{side}'
+        s.foot=names.resolve(f'cf_j_foot_{side}',tr.data.bones,default='')
+        s.toes=names.resolve(f'cf_j_toes_{side}',tr.data.bones,default='')
     for n in sorted({n for r in wf.read_weights(p.source) for n in r}):
-        x=p.source_bones.add();x.name=n;policy=vr.VRC_WEIGHT_POLICIES.get(n)
+        x=p.source_bones.add();x.name=n;policy=names.lookup(vr.VRC_WEIGHT_POLICIES,n)
         if policy and policy.source_role=='BODY' and policy.budget_region in {'LEG_L','LEG_R'}:
             x.role='BODY';x.side=policy.budget_region[-1]
         else:
             bone=sr.data.bones.get(n)
             while bone:
-                known=vr.VRC_WEIGHT_POLICIES.get(bone.name)
+                known=names.lookup(vr.VRC_WEIGHT_POLICIES,bone.name)
                 if known and known.source_role=='BODY':
                     if known.budget_region in {'LEG_L','LEG_R'}:x.side=known.budget_region[-1]
                     break
@@ -172,7 +178,8 @@ def scan(p):
         x=p.target_bones.add();x.name=n;r=target_region(n)
         if r in {'LEG_L','LEG_R'}:x.side=r[-1]
         # Conservative KK lower-leg suggestions, verified against actual support.
-        x.enabled=x.side!='NONE' and any(n.startswith(a) for a in ['cf_j_foot_','cf_j_toes_','cf_s_leg','cf_s_knee','cf_d_knee'])
+        canonical=names.canonical(n,bone_rules.KK_STANDARD_BODY_BONES)
+        x.enabled=x.side!='NONE' and any(canonical.startswith(a) for a in ['cf_j_foot_','cf_j_toes_','cf_s_leg','cf_s_knee','cf_d_knee'])
     scan_roots(p);p.scan_stamp=wf.stamp(p.source);p.spatial_reviewed=False
     p.status=_fmt('Scan complete: {v0} source groups, {v1} lace regions awaiting review', v0=len(p.source_bones), v1=len(p.roots))
     if not p.manual_direction:
@@ -211,6 +218,8 @@ def config(p):
                       'foot':s.foot,'toes':s.toes,'forward':list(s.forward),'up':list(s.up)})
     preset={'id':'FLAT_SHOE_V1','random_enabled':p.random_enabled,'random_count':p.random_count,'random_weight':p.random_weight,'seed':p.seed}
     c={'source':p.source.name,'target':p.target.name,'body':p.body.name,'prefix':p.prefix,
+       'bone_name_mode':names.mode(),
+       'influence_policy':influence_blender.settings(p),
        'sides':sides,'reviewed_dynamic_policy':{'target_spatial_distribution':True,'regions':review},
        'extend_toe':p.extend_toe,'smoothing':p.smoothing,'candidate_rings':p.candidate_rings,
        'minimum_sample_mass':p.minimum_sample_mass,'prior':p.prior,'optimize_gap':p.optimize_gap,'pose_preset':preset}
@@ -220,6 +229,8 @@ def config(p):
 
 
 def load_config(p,c,trust_review=False):
+    bpy.context.scene.kkvrc_bone_name_mode=names.mode(c.get('bone_name_mode','AUTO'))
+    influence_blender.load_settings(p,c.get('influence_policy'))
     p.source=bpy.data.objects.get(c['source']);p.target=bpy.data.objects.get(c['target']);p.body=bpy.data.objects.get(c['body'])
     scan(p)
     for x in p.source_bones:
@@ -302,6 +313,8 @@ class KKVRC_OT_shoe_action(bpy.types.Operator):
                     report=engine.run(p.source,p.target,p.body,c,directory,field_only=self.action=='A')
                 p.baseline=bpy.data.objects.get(report['baseline']);p.optimized=bpy.data.objects.get(report.get('optimized') or '')
                 p.report=json.dumps(report,ensure_ascii=False)
+                support=report.get('influence_support_B' if p.optimized else 'influence_support_A',report.get('influence_support'))
+                if support:p.influence_report=json.dumps(dict(support,object=(p.optimized or p.baseline).name))
                 show(p,p.optimized or p.baseline)
                 p.status='A generated; ready to optimize B' if self.action=='A' else ('B passed numerical validation' if report.get('accepted') else 'Keeping A; B was disabled or failed validation. See the report')
             elif self.action=='SHOW_A':show(p,p.baseline)
@@ -346,8 +359,10 @@ class KKVRC_PT_shoe_panel(bpy.types.Panel):
     bl_space_type='VIEW_3D';bl_region_type='UI';bl_category='KK/VRC Tools'
     def draw(self,context):
         p=context.scene.kkvrc_shoes;layout=self.layout
+        influence_blender.draw(layout,p)
         box=layout.box();box.label(text='1 · Inputs and scan')
         for key in ['source','target','body']:box.prop(p,key)
+        bone_names_ui.draw(box,context.scene)
         button(box,'Scan bones and lace root regions','SCAN')
         box=layout.box();box.label(text='2 · Review body and lace regions')
         box.prop(p,'show_bones')

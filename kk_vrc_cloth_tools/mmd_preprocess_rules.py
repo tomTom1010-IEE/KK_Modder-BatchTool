@@ -1,5 +1,6 @@
 """Conservative asset-scoped bone dependency planning. No Blender dependency."""
 import unicodedata
+from . import bone_names
 
 
 # Retention policy, NOT a weight-role classifier. Exact, finite conventions:
@@ -27,6 +28,7 @@ def names(value):
 
 def canonical(name):
     name = unicodedata.normalize('NFKC', name).strip()
+    name = bone_names.side_to_dot(name)
     if name.endswith(('.L', '.R')):
         name = ('左' if name.endswith('.L') else '右') + name[:-2]
     # Common spelling variants, still exact matching (no prefixes/substrings).

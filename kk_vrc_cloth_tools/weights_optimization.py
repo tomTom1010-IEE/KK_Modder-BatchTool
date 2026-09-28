@@ -84,7 +84,8 @@ def _dense(rows,names):
 
 def export_context(source, target, body, *, roles, bone_map, source_regions,
                    target_regions, finger_policy, poses, reviewed_patterns,
-                   selected=None, local_refinement=None, reference_anchors=None, excluded_body_groups=(), source_contract=None):
+                   selected=None, local_refinement=None, reference_anchors=None, excluded_body_groups=(), source_contract=None,
+                   influence_policy=None, dense_reference=None):
     """Read-only scene sampling, including exact finally restoration of pose channels.
 
     Pose controls: [{source:[(bone,fraction)], target:[(bone,fraction)],
@@ -110,6 +111,9 @@ def export_context(source, target, body, *, roles, bone_map, source_regions,
             raise ValueError('Cross-region/unmapped source reference anchor: '+name)
     source_names=sorted({n for row in original for n in row if roles[n] in {'BODY','DYNAMIC'}})
     target_names=sorted({n for row in initial for n in row if roles.get(n) != 'IGNORE'})
+    if dense_reference is not None:
+        if len(dense_reference)!=len(initial):raise ValueError('Dense reference topology mismatch')
+        target_names=sorted(set(target_names)|{n for row in dense_reference for n in row})
     if any(n in tr.data.bones and tr.data.bones[n].use_deform for row in initial for n in row if roles.get(n)=='IGNORE'):
         raise ValueError('Cannot ignore a deforming target influence')
     if set(target_names)&set(excluded_body_groups):raise ValueError('Initial state contains excluded body influences')
@@ -142,13 +146,23 @@ def export_context(source, target, body, *, roles, bone_map, source_regions,
             elif tf[n] in enabled:
                 for k,srcname in enumerate(source_names):
                     if sf.get(srcname)==tf[n] and bone_map.get(srcname)==n:expected+=sw[:,k]
-            if np.max(abs(w0[:,j]-expected))>1e-6:raise ValueError('Initial dynamic/finger differs from preserved source: '+n)
+            if np.max(abs(w0[:,j]-expected))>1e-6:
+                from .influence_policy import policy
+                approved_dynamic=(n in dynamic and policy(influence_policy)['compress_dynamic']
+                                  and target.get('kkvrc_dynamic_baseline_stamp')==wf.stamp(target))
+                if not approved_dynamic:raise ValueError('Initial dynamic/finger differs from preserved source: '+n)
     # Candidate support comes from current reviewed solution plus one-ring evidence.
-    candidates=(w0>0).copy()
+    dense=w0 if dense_reference is None else _dense(dense_reference,target_names)
+    if dense_reference is not None:
+        if np.max(abs(dense.sum(1)-1))>1e-6 or np.any(dense<0):raise ValueError('Invalid dense reference')
+        if np.max(abs(dense[fixed]-w0[fixed]),initial=0)>1e-6:raise ValueError('Dense reference changed fixed influences')
+        for r in range(6):
+            if np.max(abs(dense[:,regions==r].sum(1)-budget[:,r]))>1e-6:raise ValueError('Dense reference budget mismatch')
+    candidates=(w0>0)|(dense>0)
     for edge in target.data.edges:
         a,b=edge.vertices
         for v,u in ((a,b),(b,a)):
-            candidates[v]|=(w0[u]>0)&(budget[v,regions]>0)&~fixed[v]
+            candidates[v]|=((w0[u]>0)|(dense[u]>0))&(budget[v,regions]>0)&~fixed[v]
     delta_limits=None
     if local_refinement is not None:
         if selected is None or not len(selected):raise ValueError('Local refinement requires explicit vertices')
@@ -254,6 +268,16 @@ def export_context(source, target, body, *, roles, bone_map, source_regions,
         arrays['delta_limits']=delta_limits
         metadata['local_refinement']=local_refinement
         metadata['arrays_digest']=core.digest({k:v.tolist() for k,v in arrays.items()})
+    from .influence_policy import policy
+    metadata['influence_policy']=policy(influence_policy)
+    if dense_reference is not None:
+        arrays['dense_anchor']=dense
+        metadata['arrays_digest']=core.digest({k:v.tolist() for k,v in arrays.items()})
+    if metadata['influence_policy']['max_influences'] and metadata['influence_policy']['compress_dynamic']:
+        from .influence_blender import sample_dynamic_probes
+        probes,scale=sample_dynamic_probes(target,body,target_names,dynamic)
+        arrays.update(probes);metadata['dynamic_scale']=scale
+        metadata['arrays_digest']=core.digest({k:v.tolist() for k,v in arrays.items()})
     metadata['context_id']=core.digest(metadata)
     return arrays,metadata
 
@@ -292,7 +316,12 @@ def prepare_optimized_plan(target, arrays, metadata, candidate, validation, dest
     candidate=np.asarray(candidate,float);w0=arrays['initial'];fixed=arrays['fixed'];regions=arrays['regions']
     if candidate.shape!=w0.shape or not np.isfinite(candidate).all() or np.any(candidate<0):raise ValueError('Invalid candidate')
     if 'delta_limits' in arrays and np.any(abs(candidate-w0)>arrays['delta_limits'][:,None]+1e-7):raise ValueError('Local correction limit exceeded')
-    if np.max(abs(candidate[fixed]-w0[fixed]),initial=0)>1e-8:raise ValueError('Fixed contributions changed')
+    from .influence_policy import validate_result
+    support_check=validate_result(w0,candidate,regions,arrays['budgets'],fixed,arrays['candidates'],metadata.get('influence_policy'),
+        selected=arrays['selected'],delta_limits=arrays.get('delta_limits'),rest=arrays['target_rest'],
+        dynamic_holdout=arrays.get('dynamic_holdout'),dynamic_scale=metadata.get('dynamic_scale',1.))
+    if not support_check['constraints_ok']:raise ValueError('Influence support or fixed contribution validation failed')
+    if support_check['dynamic_changed_vertices'] and not validation.get('dynamic_contact_ok'):raise ValueError('Missing dynamic compression collision validation')
     if np.any(candidate[~arrays['candidates']]>1e-10):raise ValueError('Unauthorized candidate bone')
     for r in range(6):
         if np.max(abs(candidate[:,regions==r].sum(axis=1)-arrays['budgets'][:,r]))>1e-6:raise ValueError('Regional budget drift')
@@ -307,6 +336,7 @@ def prepare_optimized_plan(target, arrays, metadata, candidate, validation, dest
         target=destination
     names=metadata['target_names'];writes={i:{n:float(w) for n,w in zip(names,candidate[i]) if w>0} for i in selected}
     plan={'target':target.name,'expected_stamp':wf.stamp(target),'topology':wf.topology(target),
+          'influence_policy':metadata.get('influence_policy'),'influence_support':support_check,
           'excluded_body_groups':metadata.get('excluded_body_groups',[]),
           'writes':writes,'managed_groups':names,'snapshot_id':metadata['snapshot_id'],
           'summary':{'optimized_vertices':len(writes)},'skipped':{},'optimization_context':metadata['context_id'],

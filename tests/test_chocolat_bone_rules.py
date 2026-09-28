@@ -10,10 +10,44 @@ pkg = types.ModuleType('chocolat_rules_test_package')
 pkg.__path__ = [str(Path(__file__).resolve().parents[1] / 'kk_vrc_cloth_tools')]
 sys.modules[pkg.__name__] = pkg
 rules = importlib.import_module(pkg.__name__ + '.vrc_bone_rules')
+mapping = importlib.import_module(pkg.__name__ + '.vrc_kk_mapping')
 FIXTURE = json.loads((Path(__file__).parent / 'fixtures/chocolat_rigs.json').read_text())['rigs']
 
 
 class ChocolatRulesTests(unittest.TestCase):
+    def test_shared_mapping_covers_both_profiles_at_the_same_level(self):
+        for avatar in (rules.AVATAR_SHINANO, rules.AVATAR_CHOCOLAT):
+            for name in rules.VRC_BONES_BY_AVATAR[avatar]:
+                policy = rules.VRC_WEIGHT_POLICIES[name]
+                if policy.source_role != 'BODY':
+                    continue
+                if rules.TAG_VRC_BREAST_CHAIN in rules.vrc_bone_tags(name):
+                    self.assertNotIn(name, mapping.VRC_TO_KK_BODY_TARGETS)
+                else:
+                    self.assertIn(policy.reference_anchor, mapping.VRC_TO_KK_BODY_TARGETS, name)
+        for side in ('L', 'R'):
+            for legacy, compact in [('Upper_arm', 'UpperArm'), ('Lower_arm', 'LowerArm'), ('Upper_leg', 'UpperLeg'), ('Lower_leg', 'LowerLeg')]:
+                self.assertEqual(mapping.VRC_TO_KK_BODY_TARGETS[f'{legacy}.{side}'], mapping.VRC_TO_KK_BODY_TARGETS[f'{compact}.{side}'])
+            for finger in ('Thumb', 'Index', 'Middle', 'Ring', 'Little'):
+                for index, joint in enumerate(('Proximal', 'Intermediate', 'Distal'), 1):
+                    expected = f'cf_j_{finger.lower()}{index:02d}_{side}'
+                    for name in (f'{finger} {joint}.{side}', f'{finger}{joint}.{side}'):
+                        self.assertEqual(mapping.VRC_TO_KK_BODY_TARGETS[name], expected)
+
+    def test_attachment_and_weight_mapping_remain_distinct(self):
+        for name in ('Breast_root.L', 'Breast_root.R', 'Breast_L_Root', 'Breast_R_Root'):
+            self.assertEqual(mapping.VRC_BREAST_ROOT_ATTACHMENTS[name], 'cf_d_bust00')
+            self.assertNotIn(name, mapping.VRC_TO_KK_BODY_TARGETS)
+        self.assertNotIn('Hips', mapping.VRC_TO_KK_LIMB_TARGETS)
+        self.assertEqual(mapping.VRC_TO_KK_BODY_TARGETS['Hips'], 'cf_j_hips')
+        self.assertNotIn('Foot.L_end', mapping.VRC_TO_KK_BODY_TARGETS)
+        self.assertNotIn('Sleeve_L', mapping.VRC_TO_KK_BODY_TARGETS)
+
+    def test_macro_semantics_did_not_gain_finger_or_shoulder_controls(self):
+        self.assertNotIn('ThumbProximal.L', rules.VRC_MOTION_SEMANTICS)
+        self.assertNotIn('Shoulder.L', rules.VRC_MOTION_SEMANTICS)
+        self.assertEqual(rules.VRC_MOTION_SEMANTICS['UpperArm.L'], rules.VRC_MOTION_SEMANTICS['Upper_arm.L'])
+
     def test_shared_names_extend_avatar_membership(self):
         for name in ('Hips', 'Spine', 'Chest', 'Neck', 'Head', 'Shoulder.L', 'Hand.R', 'Foot.L', 'Toe.R', 'LeftEye'):
             avatars = rules.vrc_bone_avatars(name)

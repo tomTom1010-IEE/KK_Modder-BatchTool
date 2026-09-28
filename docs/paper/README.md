@@ -2,11 +2,11 @@
 
 **Semantic Budget-Constrained Skinning Transfer for Garment Retargeting**
 
-tomTomIEE, September 2026. Independent technical manuscript; not peer reviewed.
+tomTomIEE, revised September 28, 2026. Independent technical manuscript; not peer reviewed.
 
 [Read the paper (PDF)](SBCST.pdf) · [LaTeX source](sbcst.tex) · [Project](../../README.md) · [Implementation report](../technical-report.md)
 
-The paper presents the general semantic-budget formulation, feature-aware initialization, proportion-aware response transport, constrained body-weight optimization, terminal refinement, and the alternative flat-footwear spatial objective. It includes 30 numbered equations, three vector figures, and three numerical tables in a 10-page two-column layout.
+The paper presents the general semantic-budget formulation, feature-aware initialization, proportion-aware response transport, constrained body-weight optimization, terminal refinement, and the alternative flat-footwear spatial objective in a two-column academic layout. A separate **Deployment Extension: Total Influence Constraints** chapter covers the optional four-influence policy, the slot-feasibility bound, bounded support selection with continuous fitting, default-off dynamic approximation, and a controlled two-jacket dry run. It supplements the core method rather than rewriting the historical dense experiments.
 
 ## Evidence and scope
 
@@ -17,6 +17,10 @@ Public inputs:
 - [Same-input measurements](../data/three-stage-comparison.json)
 - [Historical stage and shoe measurements](../data/performance-showcase.json)
 - [Detailed comparison protocol](../three-stage-comparison.md)
+- [Total-influence dry-run measurements](../data/influence-limit-benchmark.json)
+- [Cap protocol, complete-path fidelity, timings, and unresolved rows](../influence-limit-benchmark.md)
+
+The cap study compares the old solver, current unlimited mode, and current four-mode fitting. Unlimited final weights match exactly. Four-mode fitting has a measurable support-search cost and a local fidelity tradeoff: the open jacket's terminal RMS is 8.68% higher in the complete numeric workflow. Its 140 unchanged over-limit rows remain explicit exceptions. Dynamic compression was off; no engine runtime or shoe/MMD cap performance claim is made.
 
 The public files reproduce the figures, table values, and manuscript. Third-party model assets and complete private Blender archives are not included, so these files alone do not reproduce the underlying scene experiments.
 
@@ -28,12 +32,13 @@ Install a LaTeX distribution with `pdflatex` and the packages listed in `sbcst.t
 python build_paper.py --build-dir /path/to/cache/sbcst
 ```
 
-The script regenerates vector figures and numeric table macros from the public JSON, runs LaTeX twice, checks for overflow/unresolved references, and writes `SBCST.pdf` here. Supply a real scratch directory in place of `/path/to/cache/sbcst`; intermediates stay there. Review the rendered pages after changing text, figures, font packages, or layout.
+The script regenerates vector figures and numeric table macros from the public JSON, including `influence_rows.tex`, runs LaTeX twice, checks for overflow/unresolved references, and writes `SBCST.pdf` here. This is a multi-file LaTeX project: keep the table inputs and `figures/` beside the main source. Supply a real scratch directory in place of `/path/to/cache/sbcst`; intermediates stay there. Review the rendered pages after changing text, figures, font packages, or layout.
 
 For just the figures and data tables:
 
 ```sh
 python build_figures.py
+python build_influence_tables.py
 ```
 
 The pipeline diagram is explanatory. The bar charts show recorded measurements, not synthesized examples. The source and vector figure files are included for editing and rebuilding.

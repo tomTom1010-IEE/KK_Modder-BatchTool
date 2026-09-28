@@ -8,7 +8,7 @@
 
 [Paper](docs/paper/SBCST.pdf) · [Technical Report](docs/technical-report.md) · [User Guide](USER_GUIDE.md) · [Downloads](https://github.com/tomTom1010-IEE/KK_Modder-BatchTool/releases) · [License](LICENSE)
 
-Blender add-on **0.2.24** · Blender **4.3+ declared minimum** · Local case studies on **Blender 5.2** · AGPL-3.0-only
+Blender add-on **0.3.0** · Blender **4.3+ declared minimum** · Local case studies on **Blender 5.2** · AGPL-3.0-only
 
 </div>
 
@@ -16,7 +16,7 @@ Blender add-on **0.2.24** · Blender **4.3+ declared minimum** · Local case stu
 
 *SBCST architecture: paired geometry, conserved influence budgets, task-specific fitting, and independent validation. Meshes and fields are schematic.* [Editable SVG](docs/assets/workflow.svg) · [High-resolution PNG](docs/assets/workflow.png)
 
-**SBCST paper:** *Semantic Budget-Constrained Skinning Transfer for Garment Retargeting*, a 10-page technical manuscript presenting the general formulation, constrained optimization, scoped contact review, and quantitative case studies. [Read the PDF](docs/paper/SBCST.pdf) · [LaTeX source and build instructions](docs/paper/README.md). The paper is an independent technical manuscript, not a peer-reviewed publication.
+**SBCST paper:** *Semantic Budget-Constrained Skinning Transfer for Garment Retargeting*, a technical manuscript presenting the general formulation, constrained optimization, scoped contact review, and quantitative case studies. A separate **Deployment Extension: Total Influence Constraints** chapter supplements the core method with support selection, optional dynamic approximation, and a controlled four-influence study. [Read the PDF](docs/paper/SBCST.pdf) · [LaTeX source and build instructions](docs/paper/README.md). The paper is an independent technical manuscript, not a peer-reviewed publication.
 
 ## What it does
 
@@ -33,7 +33,19 @@ Two complementary workflows share the same principle:
 
 The add-on also includes bone grafting, a conservative beginner workflow, whole-chain export cleanup, MMD garment preprocessing, and a companion Unity component-setup tool. **Static garment modeling and runtime cloth/secondary-motion simulation remain separate tasks.**
 
+**Total influence compatibility (0.3.0):** new configurations default to four total influences per vertex, counting body bones, retained dynamics, and enabled fingers together. Legacy configurations and API contexts without an explicit policy retain unlimited behavior. Budget-aware support selection precedes continuous optimization; optional dynamic approximation is **off by default**. Unresolved vertices remain unchanged and are reported, so successful fitting does not necessarily mean strict four-influence compatibility. The shared **Runtime influence compatibility** box appears in the beginner panel, garment Stage 3, and the shoe panel. [Controls and limits](docs/influence-limits.md) · [User instructions](USER_GUIDE.md#choose-a-total-influence-policy).
+
+### Four-influence deployment study
+
+A September 28 dry run compares the pre-limit solver, the new unlimited path, and four-influence fitting on the same two archived jacket inputs. **Unlimited reproduces the old final weights exactly**, with median macro timing differences of +1.64% and +0.28%, within the observed run-to-run ranges. Four-influence macro solving takes **1.79× and 2.02×** the old time, mainly for selecting bone combinations.
+
+The cap is a deployment tradeoff: macro held-out RMS is slightly lower in both cases, while the open jacket's terminal RMS is **8.68% higher** in the complete numeric workflow. All tested body-influenced holdout scopes have zero detected crossings or penetrating samples. The closed jacket fits four influences everywhere; the open jacket retains **140 unchanged over-limit vertices** because fixed contributions and required category shares cannot fit four slots with dynamic compression disabled. That result requires review and is not a strict four-influence export pass.
+
+[Protocol, timings, and fidelity](docs/influence-limit-benchmark.md) · [Machine-readable measurements](docs/data/influence-limit-benchmark.json). These are offline numerical measurements, not Unity frame-rate tests; neither shoe cap accuracy nor optional dynamic compression was benchmarked in this study.
+
 ## Recorded results
+
+The following figures describe the **historical unlimited workflow**. They are separate from the four-influence deployment study above.
 
 ### Six-category constraints: 100% fewer wrong-category vertices
 
@@ -85,6 +97,7 @@ The current interface is panel-driven: JSON is optional. Routine parameters are 
 | Read | Purpose |
 |---|---|
 | [Technical report](docs/technical-report.md) | Formulation, constraints, objectives, and measured scope |
+| [Total influence extension](docs/influence-limits.md) / [controlled dry run](docs/influence-limit-benchmark.md) | Four/unlimited policy, exceptions, optional dynamic approximation, and measured cost |
 | [User manual](USER_GUIDE.md) | Current panels, installation, review, execution, and troubleshooting |
 | [Flat-shoe implementation notes](FLAT_SHOE_WORKFLOW_CN.md) | Spatial-field details; the user manual is authoritative for current UI navigation |
 | [Weight core](WEIGHT_FEATURES_CN.md) / [Optimizer](WEIGHT_OPTIMIZER_CN.md) | Developer interfaces and invariants |

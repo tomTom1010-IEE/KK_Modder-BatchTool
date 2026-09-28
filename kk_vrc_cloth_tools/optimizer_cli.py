@@ -56,10 +56,12 @@ def run(directory, contacts=False, vertex_only=False):
         selected_mask=np.isin(np.arange(len(area)),a['selected'])
         area*=selected_mask
         excluded |= ~selected_mask
-    out,report=opt.solve(a['target_rest'],a['target_matrices'][train],a['initial'],reference[train],
+    out,report=opt.solve_limited(a['target_rest'],a['target_matrices'][train],a['initial'],reference[train],
         a['regions'],a['budgets'],a['fixed'],a['candidates'],a.get('smooth_edges',a['edges']),weights,
         selected=a['selected'],surfaces=surfaces,smooth=0 if vertex_only else local.get('smooth',MACRO['smooth']),prior=local.get('prior',MACRO['prior']),vertex_weights=area,
         delta_limits=a.get('delta_limits'),residual_scale=local.get('residual_scale'),
+        influence_policy=m.get('influence_policy'),dynamic_train=a.get('dynamic_train'),dynamic_scale=m.get('dynamic_scale',1.),
+        dense_anchor=a.get('dense_anchor'),
         trust=local.get('trust',MACRO['trust']),max_contact_steps=local.get('max_contact_steps',MACRO['max_contact_steps']),
         contact_samples=extra_samples,contact_excluded=excluded,progress=lambda event:print(json.dumps(event),flush=True))
     posed=opt.skin(a['target_rest'],a['target_matrices'],out)

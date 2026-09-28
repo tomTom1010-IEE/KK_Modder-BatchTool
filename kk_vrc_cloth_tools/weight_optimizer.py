@@ -159,7 +159,8 @@ def solve(rest, matrices, initial, reference, regions, budgets, fixed_mask,
           candidates, edges, pose_weights, selected=None, surfaces=None,
           prior=.02, smooth=.01, clearance=0., contact_tolerance=1e-4,
           trust=.15, max_contact_steps=4, time_limit=120., vertex_weights=None,
-          contact_samples=None, progress=None, contact_excluded=None, delta_limits=None, residual_scale=None):
+          contact_samples=None, progress=None, contact_excluded=None, delta_limits=None, residual_scale=None,
+          anchor=None, bound_anchor=None):
     """Sparse regional QP + sequential linearized contact constraints.
 
     regions: bone -> integer region; budgets: vertex x region.
@@ -168,6 +169,9 @@ def solve(rest, matrices, initial, reference, regions, budgets, fixed_mask,
     """
     rest=np.asarray(rest,float); matrices=np.asarray(matrices,float)
     w0=np.asarray(initial,float); reference=np.asarray(reference,float)
+    anchor=w0 if anchor is None else np.asarray(anchor,float)
+    if anchor.shape!=w0.shape or not np.isfinite(anchor).all():raise ValueError('Invalid dense correction anchor')
+    bound_anchor=w0 if bound_anchor is None else np.asarray(bound_anchor,float)
     regions=np.asarray(regions,int); budgets=np.asarray(budgets,float)
     fixed=np.asarray(fixed_mask,bool); allowed=np.asarray(candidates,bool)
     n,b=w0.shape; p=len(matrices)
@@ -215,18 +219,20 @@ def solve(rest, matrices, initial, reference, regions, budgets, fixed_mask,
             vals.append(basis[pose,vi,bi,axis]*np.sqrt(pw[pose]*vw[vi])/scale)
     design=sparse.coo_matrix((np.concatenate(vals),(np.concatenate(rr),np.concatenate(cols))),shape=(p*n*3,count)).tocsc()
     rhs=((reference-constant)*np.sqrt(pw[:,None]*vw[None,:])[:,:,None]/scale).ravel()
-    x0=w0[vi,bi]
-    # Smooth *corrections*, with fixed exterior correction zero.
-    er=[];ec=[];ev=[];nr=0
+    x0=anchor[vi,bi]
+    # Smooth corrections to the dense anchor. Removed influences contribute
+    # a nonzero constant, including edges crossing support/exterior boundaries.
+    er=[];ec=[];ev=[];lap_rhs=[];nr=0
     for u,v in edges:
         for bone in np.union1d(np.where(free[u])[0],np.where(free[v])[0]):
             for vert,sign in ((u,1),(v,-1)):
                 j=index[vert,bone]
                 if j>=0:er.append(nr);ec.append(j);ev.append(sign)
+            lap_rhs.append(anchor[u,bone]-anchor[v,bone]-frozen[u,bone]+frozen[v,bone])
             nr+=1
     lap=sparse.coo_matrix((ev,(er,ec)),shape=(nr,count)).tocsc()
     h=design.T@design+prior*sparse.eye(count,format='csc')+smooth*(lap.T@lap)
-    q=-2*(design.T@rhs+prior*x0+smooth*(lap.T@(lap@x0)))
+    q=-2*(design.T@rhs+prior*x0+smooth*(lap.T@np.asarray(lap_rhs)))
     ar=[];ac=[];av=[];budget_rhs=[]
     for v in np.where(active)[0]:
         for region in range(budgets.shape[1]):
@@ -237,7 +243,7 @@ def solve(rest, matrices, initial, reference, regions, budgets, fixed_mask,
             elif abs(target)>1e-6:raise ValueError('Positive budget with no candidates')
     eq=sparse.coo_matrix((av,(ar,ac)),shape=(len(budget_rhs),count)).tocsc()
     ident=sparse.eye(count,format='csc')
-    x=x0.copy();history=[];surfaces=surfaces or {};contact_samples=contact_samples or {}
+    x=w0[vi,bi].copy();history=[];surfaces=surfaces or {};contact_samples=contact_samples or {}
     fixed_conflicts=[]
     samples_by_pose={}
     for pose in surfaces:
@@ -277,7 +283,7 @@ def solve(rest, matrices, initial, reference, regions, budgets, fixed_mask,
                 cl.append(clearance+near[sample]@normal[sample]-const@normal[sample])
         contact=sparse.coo_matrix((cv,(cr,cc)),shape=(len(cl),count)).tocsc()
         a=sparse.vstack([eq,ident,contact],format='csc')
-        lower=np.maximum(0,x0-limits[vi]);upper=np.minimum(1,x0+limits[vi])
+        lower=np.maximum(0,bound_anchor[vi,bi]-limits[vi]);upper=np.minimum(1,bound_anchor[vi,bi]+limits[vi])
         if surfaces:lower=np.maximum(lower,x-trust);upper=np.minimum(upper,x+trust)
         lo=np.r_[budget_rhs,lower,cl]
         hi=np.r_[budget_rhs,upper,np.full(len(cl),np.inf)]
@@ -317,3 +323,27 @@ def solve(rest, matrices, initial, reference, regions, budgets, fixed_mask,
                 'excluded_contact_vertices':int(excluded.sum()),
                 'variables':count,'history':history,'baseline_rms':metric(baseline),'candidate_rms':metric(posed),
                 'contact_proxy':contacts,'max_weight_change':float(np.max(abs(out-w0)))}
+
+
+def solve_limited(rest, matrices, initial, reference, regions, budgets, fixed_mask,
+                  candidates, edges, pose_weights, *, influence_policy=None,
+                  dynamic_train=None, dynamic_scale=1., dense_anchor=None, **kwargs):
+    """Discrete support selection followed by the existing globally coupled QP."""
+    from influence_policy import policy, select, audit
+    policy_value=policy(influence_policy)
+    if not policy_value['max_influences']:
+        return solve(rest,matrices,initial,reference,regions,budgets,fixed_mask,candidates,edges,pose_weights,**kwargs)
+    seed,support,selection=select(initial,regions,budgets,fixed_mask,candidates,policy_value,
+        selected=kwargs.get('selected'),delta_limits=kwargs.get('delta_limits'),rest=rest,
+        matrices=matrices,reference=reference,pose_weights=pose_weights,prior=kwargs.get('prior',.02),
+        dynamic_train=dynamic_train,dynamic_scale=dynamic_scale,weight_prior=dense_anchor)
+    fixed=np.asarray(fixed_mask,bool).copy()
+    for row in selection['exceptions']:fixed[row['vertex']]=True
+    out,report=solve(rest,matrices,seed,reference,regions,budgets,fixed,support,edges,pose_weights,
+                     anchor=initial if dense_anchor is None else dense_anchor,bound_anchor=initial,**kwargs)
+    if report['status']=='no_free_variables':
+        report.update(status='solved',variables=0,requires_independent_validation=True)
+    report['influence_support']=dict(selection,**audit(out,policy_value))
+    # Support is an algorithm input, not evidence of validation.
+    report['influence_support']['support_mask_digest_required']=True
+    return out,report

@@ -16,6 +16,7 @@ def build(build_dir):
     build_dir = Path(build_dir).resolve()
     build_dir.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable, str(ROOT / 'build_figures.py')], check=True)
+    subprocess.run([sys.executable, str(ROOT / 'build_influence_tables.py')], check=True)
     command = ['pdflatex', '-interaction=nonstopmode', '-halt-on-error',
                f'-output-directory={build_dir}', 'sbcst.tex']
     for run in range(2):

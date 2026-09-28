@@ -1,3 +1,4 @@
+from . import bone_names
 from collections import deque
 
 import bpy
@@ -34,7 +35,7 @@ def get_weight_total(obj, vertex, group_names):
     total = 0.0
     for group_ref in vertex.groups:
         group = obj.vertex_groups[group_ref.group]
-        if group.name in group_names and group_ref.weight > 0.0:
+        if bone_names.key(group.name,group_names) is not None and group_ref.weight > 0.0:
             total += group_ref.weight
     return total
 
@@ -45,7 +46,7 @@ def get_dynamic_weight_total(obj, vertex, body_group_names):
         group = obj.vertex_groups[group_ref.group]
         if bone_rules.is_body_weight_group(group.name, body_group_names):
             continue
-        if group.name in REPLACEABLE_VRC_GROUPS:
+        if bone_names.key(group.name,REPLACEABLE_VRC_GROUPS) is not None:
             continue
         if group_ref.weight > 0.0:
             total += group_ref.weight
@@ -82,7 +83,7 @@ def scale_weights_to_capacity(weights, capacity):
 
 
 def is_lower_body_limb_group(group_name):
-    return bone_rules.is_lower_body_limb_bone(group_name)
+    return bone_names.rule_test(bone_rules, 'is_lower_body_limb_bone', group_name)
 
 
 def remove_lower_body_limb_weights(weights):
@@ -90,27 +91,27 @@ def remove_lower_body_limb_weights(weights):
 
 
 def is_torso_related_group(group_name):
-    return bone_rules.is_transfer_region_bone(group_name, bone_rules.TRANSFER_REGION_TORSO)
+    return bone_names.rule_test(bone_rules, 'is_transfer_region_bone', group_name, bone_rules.TRANSFER_REGION_TORSO)
 
 
 def is_arm_related_group(group_name):
-    return bone_rules.is_transfer_region_bone(group_name, bone_rules.TRANSFER_REGION_ARM)
+    return bone_names.rule_test(bone_rules, 'is_transfer_region_bone', group_name, bone_rules.TRANSFER_REGION_ARM)
 
 
 def is_leg_related_group(group_name):
-    return bone_rules.is_transfer_region_bone(group_name, bone_rules.TRANSFER_REGION_LEG)
+    return bone_names.rule_test(bone_rules, 'is_transfer_region_bone', group_name, bone_rules.TRANSFER_REGION_LEG)
 
 
 def is_relevant_group_for_region(group_name, region):
-    return bone_rules.is_transfer_region_bone(group_name, region)
+    return bone_names.rule_test(bone_rules, 'is_transfer_region_bone', group_name, region)
 
 
 def get_irrelevant_body_groups_for_region(group_names, region):
-    return bone_rules.irrelevant_groups_for_region(group_names, region)
+    return {n for n in group_names if bone_names.rule_test(bone_rules, 'is_kk_standard_body_bone', n)} - bone_names.region_groups(bone_rules,group_names,region)
 
 
 def filter_body_weights_for_region(weights, region):
-    kept = bone_rules.filter_groups_for_region(weights.keys(), region, weights.keys())
+    kept = bone_names.region_groups(bone_rules,weights.keys(),region)
     return {name: weight for name, weight in weights.items() if name in kept}
 
 
@@ -148,10 +149,10 @@ def mapped_vrc_weights(target, vertex, kk_bone_names):
     skipped = []
     for group_ref in vertex.groups:
         group = target.vertex_groups[group_ref.group]
-        if group.name not in REPLACEABLE_VRC_GROUPS or group_ref.weight <= 0.0:
+        if bone_names.key(group.name,REPLACEABLE_VRC_GROUPS) is None or group_ref.weight <= 0.0:
             continue
 
-        target_name = VRC_TO_KK_HYBRID_GROUPS.get(group.name)
+        target_name = bone_names.resolve(bone_names.lookup(VRC_TO_KK_HYBRID_GROUPS,group.name),kk_bone_names)
         if not target_name:
             skipped.append(group.name)
             continue
@@ -188,7 +189,7 @@ def clear_existing_weights(target, vertex_index, body_group_names, remove_replac
     removed = []
     vertex = target.data.vertices[vertex_index]
     for group in list(target.vertex_groups):
-        if group.name not in body_group_names and not (remove_replaced_vrc_groups and group.name in REPLACEABLE_VRC_GROUPS):
+        if group.name not in body_group_names and not (remove_replaced_vrc_groups and bone_names.key(group.name,REPLACEABLE_VRC_GROUPS) is not None):
             continue
         if common.get_vertex_weight(vertex, group.index) <= 0.0:
             continue
@@ -321,7 +322,7 @@ def postprocess_manual_transfer_weights(
     smooth_iterations,
 ):
     affected_vertices = set()
-    relevant_body_group_names = bone_rules.filter_groups_for_region(body_group_names, region, body_group_names)
+    relevant_body_group_names = bone_names.region_groups(bone_rules,body_group_names,region)
     used_groups = set()
     removed_groups = set()
     dynamic_overlap_vertices = 0

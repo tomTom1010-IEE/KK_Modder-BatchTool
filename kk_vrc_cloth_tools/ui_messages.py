@@ -764,3 +764,18 @@ ZH_TO_EN.update({
 })
 
 ZH_TO_EN.update({'已请求取消，正在等待当前操作停止。':'Cancellation requested; waiting for the current operation to stop.', '已启用手动 Python 配置，请在下方验证。':'Manual Python override is enabled; validate it below.'})
+
+ZH_TO_EN.update({
+    '运行时影响数兼容性':'Runtime influence compatibility',
+    '每顶点总影响数':'Total influences per vertex',
+    '四影响（身体、动骨、手指合计）':'Four (body + dynamics + fingers)',
+    '不限（旧版行为）':'Unlimited (legacy)',
+    '允许近似压缩动骨':'Allow approximate dynamic compression',
+    '动骨响应容差 / 网格跨度':'Dynamic response tolerance / mesh span',
+    '扫描影响数':'Scan influence counts',
+    '选择超限顶点':'Select over-limit vertices',
+    '未解决顶点保持不变，需要运行时验收。':'Unresolved vertices remain unchanged and require runtime review.',
+    '在四个总骨骼名额内保留预算':'Preserve budgets within four total bone slots',
+    '保留原有稠密工作流':'Keep the original dense workflow',
+    '只解决名额冲突，保留动骨总量，并要求独立骨链响应验收':'Only resolve slot conflicts; preserve the dynamic total and require separate chain-response validation',
+})

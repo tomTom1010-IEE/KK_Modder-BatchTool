@@ -1,6 +1,7 @@
 import math
 
 import bpy
+from . import bone_names
 from mathutils import Matrix, Vector
 
 from . import common
@@ -69,6 +70,7 @@ def get_side_mapping(side):
 
 
 def get_pose_bone_world_matrix(armature_obj, bone_name):
+    bone_name=bone_names.resolve(bone_name,armature_obj.data.bones,default=bone_name)
     pose_bone = armature_obj.pose.bones.get(bone_name)
     if pose_bone is not None:
         return armature_obj.matrix_world @ pose_bone.matrix
@@ -81,6 +83,7 @@ def get_pose_bone_world_matrix(armature_obj, bone_name):
 
 
 def get_bone_head_tail_world(armature_obj, bone_name):
+    bone_name=bone_names.resolve(bone_name,armature_obj.data.bones,default=bone_name)
     matrix = get_pose_bone_world_matrix(armature_obj, bone_name)
     bone = armature_obj.data.bones.get(bone_name)
     if matrix is None or bone is None:
@@ -110,6 +113,7 @@ def average_points(points):
 
 
 def find_finger_chain(bone_name):
+    bone_name=bone_names.canonical(bone_name,{n for pair in LEFT_FINGER_CHAINS + RIGHT_FINGER_CHAINS for chain in pair for n in chain})
     for source_chain, target_chain in FINGER_CHAINS:
         if bone_name in source_chain:
             return source_chain, source_chain.index(bone_name)
@@ -123,7 +127,7 @@ def get_joint_chain_vector(armature_obj, bone_name):
     if head is None:
         return None
 
-    palm_roots = PALM_FINGER_ROOTS.get(bone_name)
+    palm_roots = bone_names.lookup(PALM_FINGER_ROOTS,bone_name)
     if palm_roots:
         root_center = average_points(get_bone_head_world(armature_obj, root_name) for root_name in palm_roots)
         if root_center is None:
@@ -202,6 +206,9 @@ def build_target_matrix(vrc_armature, kk_armature, source_name, target_name, tra
 
 
 def apply_glove_pose_alignment(vrc_armature, kk_armature, mapping, transform_mode, influence):
+    bone_names.assert_unique(vrc_armature.data.bones.keys())
+    bone_names.assert_unique(kk_armature.data.bones.keys())
+    mapping={bone_names.resolve(s,vrc_armature.data.bones,default=s):bone_names.resolve(t,kk_armature.data.bones,default=t) for s,t in mapping.items()}
     influence = max(0.0, min(1.0, influence))
     changed = []
     skipped = []
@@ -244,6 +251,8 @@ def apply_glove_pose_alignment(vrc_armature, kk_armature, mapping, transform_mod
 
 
 def reset_glove_pose(vrc_armature, mapping):
+    bone_names.assert_unique(vrc_armature.data.bones.keys())
+    mapping={bone_names.resolve(s,vrc_armature.data.bones,default=s):t for s,t in mapping.items()}
     reset = []
     skipped = []
 
@@ -269,6 +278,9 @@ def reset_glove_pose(vrc_armature, mapping):
 
 
 def build_report(vrc_armature, kk_armature, mapping):
+    bone_names.assert_unique(vrc_armature.data.bones.keys())
+    bone_names.assert_unique(kk_armature.data.bones.keys())
+    mapping={bone_names.resolve(s,vrc_armature.data.bones,default=s):bone_names.resolve(t,kk_armature.data.bones,default=t) for s,t in mapping.items()}
     mapped = []
     missing_sources = []
     missing_targets = []

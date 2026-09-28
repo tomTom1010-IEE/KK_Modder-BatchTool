@@ -14,6 +14,8 @@
 
 详细观察、数据范围及目标映射边界见 [Chocolat profile](docs/chocolat-bone-profile.md)。
 
+2026-09-28：源命名统一由 `VRC_BODY_SEMANTICS` 表达解剖槽位；`vrc_kk_mapping.py` 用一套 KK 目标表生成两种 avatar 共用的默认映射。六类扫描、旧身体映射、新手手指设置及嫁接父级映射共用该数据，不为 Chocolat 另建传递算法。宏观动作槽位与六类预算未扩展；两种素体的胸骨权重／动作映射保持同一人工配置边界，胸根挂接映射不等于权重对应。
+
 ## 两张拓扑表的定位
 
 - `Armature_armature_topology_VRC.json`：历史 VRC 样本的完整拓扑快照，603 根骨。

@@ -1,3 +1,4 @@
+from . import bone_names
 import bpy
 
 from . import common
@@ -32,6 +33,7 @@ def mix_torso_hip_weights(
     smooth_strength,
     smooth_expand_rings,
 ):
+    mapping = bone_names.remap_table(mapping,obj.vertex_groups.keys(),kk_bone_names)
     source_groups = {}
     missing_sources = []
     missing_targets = []
